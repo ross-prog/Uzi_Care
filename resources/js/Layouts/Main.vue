@@ -1,13 +1,179 @@
-<script setup></script>
+<script setup>
+import { ref } from 'vue'
+import { Link, usePage } from '@inertiajs/vue3'
+
+const page = usePage()
+const showNotifications = ref(false)
+const showMobileMenu = ref(false)
+
+const logout = () => {
+    // For now, just redirect to home - in real app would handle auth
+    window.location.href = '/'
+}
+</script>
 
 <template>
-    <header class="bg-slate-800 text-white">
-        <nav class="p-6 mx-auto max-w-screen-lg">
-            <Link :href="route('home')">Home</Link>
-        </nav>
-    </header>
+    <div class="min-h-screen bg-neutral-50">
+        <!-- Navigation -->
+        <nav class="bg-white shadow-lg border-b border-neutral-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <!-- Logo and main nav -->
+                    <div class="flex">
+                        <div class="flex-shrink-0 flex items-center">
+                            <Link :href="route('dashboard')" class="text-2xl font-bold text-primary">
+                                UZI Care
+                            </Link>
+                        </div>
+                        
+                        <!-- Desktop Navigation -->
+                        <div class="hidden sm:ml-8 sm:flex sm:space-x-8">
+                            <Link 
+                                :href="route('dashboard')" 
+                                :class="[
+                                    'inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium',
+                                    route().current('dashboard') 
+                                        ? 'border-primary text-neutral-900' 
+                                        : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+                                ]"
+                            >
+                                Dashboard
+                            </Link>
+                            
+                            <Link 
+                                :href="route('ai.forecasting')" 
+                                :class="[
+                                    'inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium',
+                                    route().current('ai.forecasting') 
+                                        ? 'border-primary text-neutral-900' 
+                                        : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+                                ]"
+                            >
+                                AI Forecasting
+                            </Link>
+                            
+                            <Link 
+                                :href="route('ehr.index')" 
+                                :class="[
+                                    'inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium',
+                                    route().current('ehr.*') || route().current('patient-consultation.*')
+                                        ? 'border-blue-500 text-gray-900' 
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                ]"
+                            >
+                                EHR
+                            </Link>
+                            
+                            <Link 
+                                :href="route('inventory.index')" 
+                                :class="[
+                                    'inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium',
+                                    route().current('inventory.*') 
+                                        ? 'border-blue-500 text-gray-900' 
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                ]"
+                            >
+                                Inventory
+                            </Link>
+                            
+                            <Link 
+                                :href="route('reports.index')" 
+                                :class="[
+                                    'inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium',
+                                    route().current('reports.*') 
+                                        ? 'border-blue-500 text-gray-900' 
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                ]"
+                            >
+                                Reports
+                            </Link>
+                        </div>
+                    </div>
 
-    <main class="p-6">
-        <slot />
-    </main>
+                    <!-- Right side buttons -->
+                    <div class="hidden sm:ml-6 sm:flex sm:items-center">
+                        <!-- Notifications -->
+                        <div class="relative">
+                            <button 
+                                @click="showNotifications = !showNotifications"
+                                class="bg-white p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            >
+                                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-3.5-3.5L15 17zm0 0l-8.5-8.5M12 3V1m0 2a9 9 0 110 18 9 9 0 010-18z" />
+                                </svg>
+                                <span class="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white"></span>
+                            </button>
+                            
+                            <!-- Notifications dropdown -->
+                            <div v-show="showNotifications" class="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
+                                <div class="py-1">
+                                    <div class="px-4 py-2 text-sm text-gray-700 border-b">
+                                        <h3 class="font-medium">Notifications</h3>
+                                    </div>
+                                    <div class="px-4 py-2 text-sm text-gray-600">
+                                        <div class="flex items-center space-x-2">
+                                            <span class="w-2 h-2 bg-yellow-400 rounded-full"></span>
+                                            <span>3 items low in stock</span>
+                                        </div>
+                                    </div>
+                                    <div class="px-4 py-2 text-sm text-gray-600">
+                                        <div class="flex items-center space-x-2">
+                                            <span class="w-2 h-2 bg-red-400 rounded-full"></span>
+                                            <span>2 medicines nearing expiry</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Logout button -->
+                        <button 
+                            @click="logout"
+                            class="ml-4 bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                        >
+                            Logout
+                        </button>
+                    </div>
+
+                    <!-- Mobile menu button -->
+                    <div class="sm:hidden flex items-center">
+                        <button 
+                            @click="showMobileMenu = !showMobileMenu"
+                            class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+                        >
+                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile menu -->
+            <div v-show="showMobileMenu" class="sm:hidden">
+                <div class="pt-2 pb-3 space-y-1">
+                    <Link :href="route('dashboard')" class="block pl-3 pr-4 py-2 border-l-4 text-base font-medium border-blue-500 text-blue-700 bg-blue-50">
+                        Dashboard
+                    </Link>
+                    <Link :href="route('ai.forecasting')" class="block pl-3 pr-4 py-2 border-l-4 text-base font-medium border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50 hover:border-gray-300">
+                        AI Forecasting
+                    </Link>
+                    <Link :href="route('ehr.index')" class="block pl-3 pr-4 py-2 border-l-4 text-base font-medium border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50 hover:border-gray-300">
+                        EHR
+                    </Link>
+                    <Link :href="route('inventory.index')" class="block pl-3 pr-4 py-2 border-l-4 text-base font-medium border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50 hover:border-gray-300">
+                        Inventory
+                    </Link>
+                    <Link :href="route('reports.index')" class="block pl-3 pr-4 py-2 border-l-4 text-base font-medium border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50 hover:border-gray-300">
+                        Reports
+                    </Link>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main content -->
+        <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            <slot />
+        </main>
+    </div>
 </template>
