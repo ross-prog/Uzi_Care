@@ -5,16 +5,37 @@ namespace App\Http\Controllers;
 use App\Models\PatientConsultationRecord;
 use App\Models\NurseNote;
 use App\Models\Medicine;
+use App\Models\Inventory;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\DB;
 
 class PatientConsultationController extends Controller
 {
     public function index()
     {
-        $medicines = Medicine::whereNotIn('type', ['Medical Supply', 'Medical Device'])->orderBy('name')->get();
-        $equipment = Medicine::whereIn('type', ['Medical Supply', 'Medical Device'])->orderBy('name')->get();
+        // Get medicines with inventory quantities - fixed approach
+        $medicines = Medicine::whereNotIn('type', ['Medical Supply', 'Medical Device'])
+            ->orderBy('name')
+            ->get()
+            ->map(function($medicine) {
+                // Calculate total available quantity across all inventory records
+                $totalQuantity = Inventory::where('medicine_id', $medicine->id)->sum('quantity');
+                $medicine->available_quantity = $totalQuantity ?? 0;
+                return $medicine;
+            });
+        
+        // Get equipment with inventory quantities - fixed approach
+        $equipment = Medicine::whereIn('type', ['Medical Supply', 'Medical Device'])
+            ->orderBy('name')
+            ->get()
+            ->map(function($equipmentItem) {
+                // Calculate total available quantity across all inventory records
+                $totalQuantity = Inventory::where('medicine_id', $equipmentItem->id)->sum('quantity');
+                $equipmentItem->available_quantity = $totalQuantity ?? 0;
+                return $equipmentItem;
+            });
         
         return Inertia::render('EHR/Index', [
             'medicines' => $medicines,
@@ -103,12 +124,100 @@ class PatientConsultationController extends Controller
             'equipment' => 'nullable|array',
         ]);
 
-        $record = PatientConsultationRecord::create($validatedData);
-
-        return response()->json([
-            'message' => 'Patient consultation record created successfully',
-            'record' => $record->load('nurseNotes')
-        ]);
+        // Start database transaction for inventory deduction
+        DB::beginTransaction();
+        
+        try {
+            // Check inventory availability for medicines
+            if (!empty($validatedData['medicines'])) {
+                foreach ($validatedData['medicines'] as $medicine) {
+                    $medicineName = $medicine['name'];
+                    $quantityUsed = isset($medicine['quantity']) ? $medicine['quantity'] : 1;
+                    
+                    // Find medicine in inventory
+                    $inventoryItem = Inventory::whereHas('medicine', function($query) use ($medicineName) {
+                        $query->where('name', $medicineName);
+                    })->first();
+                    
+                    if (!$inventoryItem) {
+                        throw new \Exception("Medicine '{$medicineName}' not found in inventory.");
+                    }
+                    
+                    if ($inventoryItem->quantity < $quantityUsed) {
+                        throw new \Exception("Insufficient stock for '{$medicineName}'. Available: {$inventoryItem->quantity}, Required: {$quantityUsed}");
+                    }
+                }
+            }
+            
+            // Check inventory availability for equipment
+            if (!empty($validatedData['equipment'])) {
+                foreach ($validatedData['equipment'] as $equipment) {
+                    $equipmentName = $equipment['name'];
+                    $quantityUsed = isset($equipment['quantity']) ? $equipment['quantity'] : 1;
+                    
+                    // Find equipment in inventory
+                    $inventoryItem = Inventory::whereHas('medicine', function($query) use ($equipmentName) {
+                        $query->where('name', $equipmentName);
+                    })->first();
+                    
+                    if (!$inventoryItem) {
+                        throw new \Exception("Equipment '{$equipmentName}' not found in inventory.");
+                    }
+                    
+                    if ($inventoryItem->quantity < $quantityUsed) {
+                        throw new \Exception("Insufficient stock for '{$equipmentName}'. Available: {$inventoryItem->quantity}, Required: {$quantityUsed}");
+                    }
+                }
+            }
+            
+            // Create the patient consultation record
+            $record = PatientConsultationRecord::create($validatedData);
+            
+            // Deduct medicines from inventory
+            if (!empty($validatedData['medicines'])) {
+                foreach ($validatedData['medicines'] as $medicine) {
+                    $medicineName = $medicine['name'];
+                    $quantityUsed = isset($medicine['quantity']) ? $medicine['quantity'] : 1;
+                    
+                    $inventoryItem = Inventory::whereHas('medicine', function($query) use ($medicineName) {
+                        $query->where('name', $medicineName);
+                    })->first();
+                    
+                    $inventoryItem->decrement('quantity', $quantityUsed);
+                }
+            }
+            
+            // Deduct equipment from inventory
+            if (!empty($validatedData['equipment'])) {
+                foreach ($validatedData['equipment'] as $equipment) {
+                    $equipmentName = $equipment['name'];
+                    $quantityUsed = isset($equipment['quantity']) ? $equipment['quantity'] : 1;
+                    
+                    $inventoryItem = Inventory::whereHas('medicine', function($query) use ($equipmentName) {
+                        $query->where('name', $equipmentName);
+                    })->first();
+                    
+                    $inventoryItem->decrement('quantity', $quantityUsed);
+                }
+            }
+            
+            // Commit the transaction
+            DB::commit();
+            
+            return response()->json([
+                'message' => 'Patient consultation record created successfully and inventory updated',
+                'record' => $record->load('nurseNotes')
+            ]);
+            
+        } catch (\Exception $e) {
+            // Rollback the transaction on error
+            DB::rollback();
+            
+            return response()->json([
+                'message' => 'Error creating consultation record: ' . $e->getMessage(),
+                'error' => $e->getMessage()
+            ], 400);
+        }
     }
 
     public function show(PatientConsultationRecord $record)

@@ -15,6 +15,7 @@ class PatientConsultationRecord extends Model
         'consultation_date_time',
         
         // Personal Information
+        'full_name',
         'last_name',
         'first_name',
         'middle_name',
@@ -23,6 +24,7 @@ class PatientConsultationRecord extends Model
         'civil_status',
         'sex',
         'address',
+        'department',
         'department_course',
         'contact_no',
         

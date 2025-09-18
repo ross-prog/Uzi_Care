@@ -15,13 +15,13 @@ class DashboardController extends Controller
         // Get today's patient visits
         $todayVisits = PatientConsultationRecord::whereDate('consultation_date_time', Carbon::today())->count();
         
-        // Get low stock items
+        // Get low stock items - fixed to ensure proper counting
         $lowStockItems = Inventory::with('medicine')
             ->whereRaw('quantity <= low_stock_threshold')
             ->take(5)
             ->get();
         
-        // Get medicines nearing expiry (next 30 days)
+        // Get medicines nearing expiry (next 30 days) - fixed to ensure proper counting
         $nearingExpiry = Inventory::with('medicine')
             ->where('expiry_date', '<=', Carbon::now()->addDays(30))
             ->where('expiry_date', '>=', Carbon::now())
@@ -29,15 +29,35 @@ class DashboardController extends Controller
             ->get();
         
         // Recent patients (last 10)
-        $recentPatients = PatientConsultationRecord::orderBy('created_at', 'desc')
+        $recentPatients = PatientConsultationRecord::orderBy('consultation_date_time', 'desc')
             ->take(10)
-            ->get();
+            ->get()
+            ->map(function ($patient) {
+                return [
+                    'id' => $patient->id,
+                    'first_name' => $patient->first_name,
+                    'middle_name' => $patient->middle_name,
+                    'last_name' => $patient->last_name,
+                    'full_name' => $patient->getFullNameAttribute(),
+                    'student_employee_id' => $patient->student_employee_id,
+                    'department_course' => $patient->department_course,
+                    'consultation_date_time' => $patient->consultation_date_time,
+                    'chief_complaints' => $patient->chief_complaints,
+                    'diagnosis' => $patient->diagnosis,
+                ];
+            });
+
+        // Get actual counts for stats
+        $lowStockCount = Inventory::whereRaw('quantity <= low_stock_threshold')->count();
+        $nearingExpiryCount = Inventory::where('expiry_date', '<=', Carbon::now()->addDays(30))
+            ->where('expiry_date', '>=', Carbon::now())
+            ->count();
 
         return Inertia::render('Dashboard', [
             'stats' => [
                 'todayVisits' => $todayVisits,
-                'lowStockCount' => $lowStockItems->count(),
-                'nearingExpiryCount' => $nearingExpiry->count(),
+                'lowStockCount' => $lowStockCount,
+                'nearingExpiryCount' => $nearingExpiryCount,
                 'totalPatients' => PatientConsultationRecord::distinct('student_employee_id')->count(),
             ],
             'lowStockItems' => $lowStockItems,

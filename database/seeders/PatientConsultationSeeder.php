@@ -22,6 +22,7 @@ class PatientConsultationSeeder extends Seeder
                 'consultation_date_time' => Carbon::now()->subDays(5)->setTime(10, 30),
                 
                 // Personal Information
+                'full_name' => 'Cruz, Maria Santos',
                 'last_name' => 'Cruz',
                 'first_name' => 'Maria',
                 'middle_name' => 'Santos',
@@ -30,6 +31,7 @@ class PatientConsultationSeeder extends Seeder
                 'civil_status' => 'Single',
                 'sex' => 'Female',
                 'address' => '123 Main St, Barangay San Antonio, Manila City',
+                'department' => 'School of Computing and Information Technology',
                 'department_course' => 'Bachelor of Science in Computer Science',
                 'contact_no' => '09123456789',
                 
@@ -91,6 +93,7 @@ class PatientConsultationSeeder extends Seeder
                 'consultation_date_time' => Carbon::now()->subDays(3)->setTime(14, 15),
                 
                 // Personal Information
+                'full_name' => 'Garcia, Juan Dela Cruz',
                 'last_name' => 'Garcia',
                 'first_name' => 'Juan',
                 'middle_name' => 'Dela Cruz',
@@ -99,6 +102,7 @@ class PatientConsultationSeeder extends Seeder
                 'civil_status' => 'Single',
                 'sex' => 'Male',
                 'address' => '456 Oak Avenue, Barangay Bagumbayan, Quezon City',
+                'department' => 'School of Technician Studies',
                 'department_course' => 'Bachelor of Science in Mechanical Engineering',
                 'contact_no' => '09987654321',
                 
@@ -161,6 +165,7 @@ class PatientConsultationSeeder extends Seeder
                 'consultation_date_time' => Carbon::now()->subDays(1)->setTime(9, 45),
                 
                 // Personal Information
+                'full_name' => 'Rodriguez, Anna Luna',
                 'last_name' => 'Rodriguez',
                 'first_name' => 'Anna',
                 'middle_name' => 'Luna',
@@ -169,6 +174,7 @@ class PatientConsultationSeeder extends Seeder
                 'civil_status' => 'Single',
                 'sex' => 'Female',
                 'address' => '789 Pine Street, Barangay Poblacion, Makati City',
+                'department' => 'School of Entrepreneurship and Business Sciences',
                 'department_course' => 'Bachelor of Science in Business Administration',
                 'contact_no' => '09111222333',
                 
@@ -231,6 +237,7 @@ class PatientConsultationSeeder extends Seeder
                 'consultation_date_time' => Carbon::today()->setTime(13, 20),
                 
                 // Personal Information
+                'full_name' => 'Santos, Patricia Cruz',
                 'last_name' => 'Santos',
                 'first_name' => 'Patricia',
                 'middle_name' => 'Cruz',
@@ -239,6 +246,7 @@ class PatientConsultationSeeder extends Seeder
                 'civil_status' => 'Married',
                 'sex' => 'Female',
                 'address' => '555 Cedar Avenue, Barangay Rosario, Pasig City',
+                'department' => 'School of Human Resource Development',
                 'department_course' => 'Faculty - College of Nursing',
                 'contact_no' => '09777888999',
                 
@@ -293,6 +301,140 @@ class PatientConsultationSeeder extends Seeder
                     ['name' => 'Automated BP monitor', 'purpose' => 'Home blood pressure monitoring'],
                     ['name' => 'Weight scale', 'purpose' => 'Weight monitoring']
                 ]
+            ],
+            [
+                // Basic Information
+                'student_employee_id' => '2024003456',
+                'consultation_date_time' => Carbon::now()->subDays(7)->setTime(11, 00),
+                
+                // Personal Information
+                'full_name' => 'Reyes, Mark Anthony Villanueva',
+                'last_name' => 'Reyes',
+                'first_name' => 'Mark Anthony',
+                'middle_name' => 'Villanueva',
+                'age' => 21,
+                'birthdate' => Carbon::now()->subYears(21)->subMonths(5),
+                'civil_status' => 'Single',
+                'sex' => 'Male',
+                'address' => '123 Hospitality Drive, Barangay Tourism, Baguio City',
+                'department' => 'School of Hospitality Management',
+                'department_course' => 'Bachelor of Science in Hotel and Restaurant Management',
+                'contact_no' => '09191234567',
+                
+                // Guardian Information
+                'guardian_name' => 'Elena Reyes',
+                'guardian_relationship' => 'Mother',
+                'guardian_contact_no' => '09191234566',
+                
+                // Chief Complaints
+                'chief_complaints' => 'Minor cut on hand from kitchen accident during culinary class',
+                
+                // Medical History
+                'has_allergy' => false,
+                'allergy_specify' => null,
+                'has_hypertension' => false,
+                'has_diabetes' => false,
+                'has_asthma' => false,
+                'asthma_last_attack' => null,
+                'other_medical_history' => null,
+                
+                // Vital Signs (Time 1)
+                'vital_signs_time_1' => '11:00',
+                'blood_pressure_1' => '118/75',
+                'heart_rate_1' => '78',
+                'respiratory_rate_1' => '18',
+                'temperature_1' => 36.5,
+                'oxygen_saturation_1' => '99',
+                
+                // Vital Signs (Time 2)
+                'vital_signs_time_2' => '11:30',
+                'blood_pressure_2' => '120/76',
+                'heart_rate_2' => '76',
+                'respiratory_rate_2' => '17',
+                'temperature_2' => 36.6,
+                'oxygen_saturation_2' => '99',
+                
+                // Diagnosis and Staff
+                'diagnosis' => 'Minor laceration on left hand, cleaned and dressed',
+                'nurse_on_duty' => 'Nurse Maria Santos, RN',
+                'physician_on_duty' => 'Dr. Jose Martinez, MD',
+                
+                // Medicines and Equipment
+                'medicines' => [
+                    ['name' => 'Betadine solution', 'dosage' => 'Topical', 'frequency' => '2x daily', 'duration' => '5 days'],
+                    ['name' => 'Paracetamol', 'dosage' => '500mg', 'frequency' => 'As needed for pain', 'duration' => '3 days']
+                ],
+                'equipment' => [
+                    ['name' => 'Sterile gauze', 'purpose' => 'Wound dressing'],
+                    ['name' => 'Medical tape', 'purpose' => 'Securing dressing']
+                ]
+            ],
+            [
+                // Basic Information
+                'student_employee_id' => '2024004567',
+                'consultation_date_time' => Carbon::now()->subDays(2)->setTime(15, 30),
+                
+                // Personal Information
+                'full_name' => 'Mendoza, Sarah Jane Flores',
+                'last_name' => 'Mendoza',
+                'first_name' => 'Sarah Jane',
+                'middle_name' => 'Flores',
+                'age' => 20,
+                'birthdate' => Carbon::now()->subYears(20)->subMonths(9),
+                'civil_status' => 'Single',
+                'sex' => 'Female',
+                'address' => '789 Creative Avenue, Barangay Arts, Makati City',
+                'department' => 'School of Creative Arts, Media and Social Sciences',
+                'department_course' => 'Bachelor of Fine Arts in Digital Arts',
+                'contact_no' => '09123456789',
+                
+                // Guardian Information
+                'guardian_name' => 'Carlos Mendoza',
+                'guardian_relationship' => 'Father',
+                'guardian_contact_no' => '09123456788',
+                
+                // Chief Complaints
+                'chief_complaints' => 'Eye strain and headaches from prolonged computer work',
+                
+                // Medical History
+                'has_allergy' => false,
+                'allergy_specify' => null,
+                'has_hypertension' => false,
+                'has_diabetes' => false,
+                'has_asthma' => false,
+                'asthma_last_attack' => null,
+                'other_medical_history' => 'Myopia (-2.5 both eyes)',
+                
+                // Vital Signs (Time 1)
+                'vital_signs_time_1' => '15:30',
+                'blood_pressure_1' => '110/70',
+                'heart_rate_1' => '72',
+                'respiratory_rate_1' => '16',
+                'temperature_1' => 36.7,
+                'oxygen_saturation_1' => '99',
+                
+                // Vital Signs (Time 2)
+                'vital_signs_time_2' => '16:00',
+                'blood_pressure_2' => '112/72',
+                'heart_rate_2' => '74',
+                'respiratory_rate_2' => '16',
+                'temperature_2' => 36.6,
+                'oxygen_saturation_2' => '99',
+                
+                // Diagnosis and Staff
+                'diagnosis' => 'Computer vision syndrome, digital eye strain',
+                'nurse_on_duty' => 'Nurse Jennifer Cruz, RN',
+                'physician_on_duty' => 'Dr. Lisa Garcia, MD',
+                
+                // Medicines and Equipment
+                'medicines' => [
+                    ['name' => 'Artificial tears', 'dosage' => '1-2 drops', 'frequency' => '4x daily', 'duration' => '2 weeks'],
+                    ['name' => 'Ibuprofen', 'dosage' => '200mg', 'frequency' => 'As needed for headache', 'duration' => '1 week']
+                ],
+                'equipment' => [
+                    ['name' => 'Eye chart', 'purpose' => 'Visual acuity testing'],
+                    ['name' => 'Ophthalmoscope', 'purpose' => 'Eye examination']
+                ]
             ]
         ];
 
@@ -305,7 +447,7 @@ class PatientConsultationSeeder extends Seeder
                     'patient_consultation_record_id' => $consultation->id,
                     'patient_name' => $consultation->full_name,
                     'age' => $consultation->age,
-                    'department' => $consultation->department_course,
+                    'department' => $consultation->department,
                     'student_employee_id' => $consultation->student_employee_id,
                     'contact_no' => $consultation->contact_no,
                     'entry_date_time' => $consultation->consultation_date_time->addHours(2),

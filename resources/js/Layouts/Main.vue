@@ -1,10 +1,21 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Link, usePage } from '@inertiajs/vue3'
 
 const page = usePage()
 const showNotifications = ref(false)
 const showMobileMenu = ref(false)
+
+// Get notification data from shared data
+const notificationData = computed(() => page.props.notificationData || {
+    lowStockCount: 0,
+    nearingExpiryCount: 0
+})
+
+// Calculate total notification count
+const totalNotifications = computed(() => 
+    notificationData.value.lowStockCount + notificationData.value.nearingExpiryCount
+)
 
 const logout = () => {
     // For now, just redirect to home - in real app would handle auth
@@ -101,7 +112,13 @@ const logout = () => {
                                 <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-3.5-3.5L15 17zm0 0l-8.5-8.5M12 3V1m0 2a9 9 0 110 18 9 9 0 010-18z" />
                                 </svg>
-                                <span class="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white"></span>
+                                <!-- Show notification badge only if there are notifications -->
+                                <span 
+                                    v-if="totalNotifications > 0" 
+                                    class="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-red-600 rounded-full min-w-[1.25rem]"
+                                >
+                                    {{ totalNotifications > 99 ? '99+' : totalNotifications }}
+                                </span>
                             </button>
                             
                             <!-- Notifications dropdown -->
@@ -109,18 +126,43 @@ const logout = () => {
                                 <div class="py-1">
                                     <div class="px-4 py-2 text-sm text-gray-700 border-b">
                                         <h3 class="font-medium">Notifications</h3>
+                                        <p class="text-xs text-gray-500 mt-1">{{ totalNotifications }} total alerts</p>
                                     </div>
-                                    <div class="px-4 py-2 text-sm text-gray-600">
-                                        <div class="flex items-center space-x-2">
-                                            <span class="w-2 h-2 bg-yellow-400 rounded-full"></span>
-                                            <span>3 items low in stock</span>
+                                    
+                                    <!-- Low stock notification -->
+                                    <div v-if="notificationData.lowStockCount > 0" class="px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 border-b">
+                                        <div class="flex items-center space-x-3">
+                                            <span class="w-2 h-2 bg-yellow-400 rounded-full flex-shrink-0"></span>
+                                            <div class="flex-1">
+                                                <p class="font-medium text-gray-900">{{ notificationData.lowStockCount }} items low in stock</p>
+                                                <p class="text-xs text-gray-500">Items below threshold level</p>
+                                            </div>
+                                            <Link :href="route('inventory.index')" class="text-xs text-blue-600 hover:text-blue-800">
+                                                View
+                                            </Link>
                                         </div>
                                     </div>
-                                    <div class="px-4 py-2 text-sm text-gray-600">
-                                        <div class="flex items-center space-x-2">
-                                            <span class="w-2 h-2 bg-red-400 rounded-full"></span>
-                                            <span>2 medicines nearing expiry</span>
+                                    
+                                    <!-- Nearing expiry notification -->
+                                    <div v-if="notificationData.nearingExpiryCount > 0" class="px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 border-b">
+                                        <div class="flex items-center space-x-3">
+                                            <span class="w-2 h-2 bg-red-400 rounded-full flex-shrink-0"></span>
+                                            <div class="flex-1">
+                                                <p class="font-medium text-gray-900">{{ notificationData.nearingExpiryCount }} medicines nearing expiry</p>
+                                                <p class="text-xs text-gray-500">Expiring within 30 days</p>
+                                            </div>
+                                            <Link :href="route('inventory.index')" class="text-xs text-blue-600 hover:text-blue-800">
+                                                View
+                                            </Link>
                                         </div>
+                                    </div>
+                                    
+                                    <!-- No notifications -->
+                                    <div v-if="totalNotifications === 0" class="px-4 py-8 text-center text-sm text-gray-500">
+                                        <svg class="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        <p>All good! No alerts at this time.</p>
                                     </div>
                                 </div>
                             </div>

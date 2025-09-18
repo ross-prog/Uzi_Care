@@ -45,9 +45,16 @@ Route::prefix('inventory')->name('inventory.')->group(function () {
     Route::get('/nearing-expiry', [InventoryController::class, 'nearingExpiry'])->name('nearing-expiry');
 });
 
+// Medicine Routes
+Route::post('/medicines', [InventoryController::class, 'storeMedicine'])->name('medicines.store');
+
 // Reports Routes
 Route::prefix('reports')->name('reports.')->group(function () {
     Route::get('/', [ReportsController::class, 'index'])->name('index');
+    Route::get('/statistics', [ReportsController::class, 'statistics'])->name('statistics');
+    Route::get('/patients', [ReportsController::class, 'patients'])->name('patients');
+    Route::get('/patients/export', [ReportsController::class, 'exportPatientsReport'])->name('patients.export');
+    Route::get('/statistics/export', [ReportsController::class, 'exportStatisticalReport'])->name('statistics.export');
     Route::get('/patient-visits', [ReportsController::class, 'patientVisits'])->name('patient-visits');
     Route::get('/inventory-report', [ReportsController::class, 'inventoryReport'])->name('inventory');
 });

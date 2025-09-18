@@ -14,5 +14,12 @@ class Medicine extends Model
         'description',
         'type',
         'unit',
+        'dosage_strength',
+        'form',
     ];
+
+    public function inventory()
+    {
+        return $this->hasMany(Inventory::class);
+    }
 }

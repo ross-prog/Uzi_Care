@@ -19,6 +19,10 @@ const showRecordModal = ref(false);
 const showNurseNotesModal = ref(false);
 const nurseNotes = ref([]);
 
+// Optional sections toggle
+const showVitalSigns = ref(false);
+const showEquipment = ref(false);
+
 const currentView = ref("dashboard");
 
 const form = reactive({
@@ -27,14 +31,16 @@ const form = reactive({
 	consultation_date_time: new Date().toISOString().slice(0, 16),
 
 	// Personal Information
+	full_name: "", // New combined name field
 	last_name: "",
 	first_name: "",
 	middle_name: "",
-	age: "",
+	age: null, // Changed from "" to null for number input
 	birthdate: "",
 	civil_status: "Single",
 	sex: "Male",
 	address: "",
+	department: "",
 	department_course: "",
 	contact_no: "",
 
@@ -94,6 +100,15 @@ const nurseNoteForm = reactive({
 
 const civilStatusOptions = ["Single", "Married", "Divorced", "Widowed", "Separated"];
 
+const departmentOptions = [
+	"SCHOOL OF MEDICINE",
+	"SCHOOL OF DENTISTRY",
+	"SCHOOL OF CRIMINAL JUSTICE",
+	"SCHOOL OF ENGINEERING INFORMATION COMPUTER AND TECHNOLOGY",
+	"SCHOOL OF EDUCATION",
+	"SCHOOL OF LIBERAL ARTS",
+];
+
 // Computed BMI calculation
 const calculatedBMI = computed(() => {
 	if (form.weight && form.height) {
@@ -107,6 +122,29 @@ const calculatedBMI = computed(() => {
 watch([() => form.weight, () => form.height], () => {
 	form.bmi = calculatedBMI.value;
 });
+
+// Watch for full name changes and split into first_name, last_name
+watch(
+	() => form.full_name,
+	(newFullName) => {
+		if (newFullName && newFullName.trim()) {
+			const nameParts = newFullName.trim().split(" ");
+			if (nameParts.length >= 2) {
+				// Assume last part is first name, everything before is last name
+				form.first_name = nameParts[nameParts.length - 1];
+				form.last_name = nameParts.slice(0, nameParts.length - 1).join(" ");
+			} else if (nameParts.length === 1) {
+				// Only one name provided, put it in first_name
+				form.first_name = nameParts[0];
+				form.last_name = "";
+			}
+		} else {
+			// Clear individual names if full name is empty
+			form.first_name = "";
+			form.last_name = "";
+		}
+	}
+);
 
 const searchPatient = async () => {
 	if (!searchQuery.value) {
@@ -169,14 +207,16 @@ const resetForm = () => {
 	Object.assign(form, {
 		student_employee_id: "",
 		consultation_date_time: new Date().toISOString().slice(0, 16),
+		full_name: "", // Add missing full_name field
 		last_name: "",
 		first_name: "",
 		middle_name: "",
-		age: "",
+		age: null, // Changed from "" to null for number input
 		birthdate: "",
 		civil_status: "Single",
 		sex: "Male",
 		address: "",
+		department: "", // Add missing department field
 		department_course: "",
 		contact_no: "",
 		guardian_name: "",
@@ -279,9 +319,58 @@ const updateEquipmentQuantity = (index, quantity) => {
 
 // New methods for comprehensive form structure
 const addMedicineFromInventory = (medicine) => {
+	// Debug: Check medicine object structure
+	console.log("Medicine object:", medicine);
+	console.log("Dosage strength:", medicine.dosage_strength);
+	console.log("Form:", medicine.form);
+
+	// Check if medicine is in stock
+	if (medicine.available_quantity <= 0) {
+		alert(`${medicine.name} is out of stock and cannot be added.`);
+		return;
+	}
+
+	// Auto-populate dosage with strength info if available
+	let suggestedDosage = "";
+	if (medicine.dosage_strength && medicine.form) {
+		// Create a comprehensive dosage suggestion
+		if (
+			medicine.form.toLowerCase().includes("tablet") ||
+			medicine.form.toLowerCase().includes("capsule")
+		) {
+			suggestedDosage = `1 ${medicine.form} (${medicine.dosage_strength})`;
+		} else if (
+			medicine.form.toLowerCase().includes("syrup") ||
+			medicine.form.toLowerCase().includes("liquid")
+		) {
+			// For liquids, suggest 5ml or extract ml amount from dosage_strength
+			const mlMatch = medicine.dosage_strength.match(/(\d+)ml/i);
+			if (mlMatch) {
+				suggestedDosage = `5ml from ${medicine.dosage_strength} bottle`;
+			} else {
+				suggestedDosage = `5ml (${medicine.dosage_strength})`;
+			}
+		} else {
+			suggestedDosage = `1 ${medicine.form} (${medicine.dosage_strength})`;
+		}
+	} else if (medicine.dosage_strength) {
+		// If only dosage strength is available
+		suggestedDosage = medicine.dosage_strength;
+	} else if (medicine.form) {
+		// If only form is available
+		suggestedDosage = `1 ${medicine.form}`;
+	} else {
+		// Default suggestion
+		suggestedDosage = "1 unit";
+	}
+
+	console.log("Suggested dosage:", suggestedDosage);
+
 	form.medicines.push({
+		id: medicine.id,
 		name: medicine.name,
-		dosage: "",
+		quantity: 1,
+		dosage: suggestedDosage,
 		frequency: "",
 		duration: "",
 	});
@@ -291,6 +380,7 @@ const addCustomMedicine = () => {
 	if (newMedicine.name) {
 		form.medicines.push({
 			name: newMedicine.name,
+			quantity: 1,
 			dosage: newMedicine.dosage || "",
 			frequency: newMedicine.frequency || "",
 			duration: newMedicine.duration || "",
@@ -304,6 +394,12 @@ const addCustomMedicine = () => {
 };
 
 const addEquipmentFromInventory = (equipment) => {
+	// Check if equipment is in stock
+	if (equipment.available_quantity <= 0) {
+		alert(`${equipment.name} is out of stock and cannot be added.`);
+		return;
+	}
+
 	form.equipment.push({
 		name: equipment.name,
 		purpose: "",
@@ -323,15 +419,50 @@ const addCustomEquipment = () => {
 };
 
 const submitForm = async () => {
-	if (
-		!form.student_employee_id ||
-		!form.first_name ||
-		!form.last_name ||
-		!form.chief_complaints ||
-		!form.diagnosis ||
-		!form.nurse_on_duty
-	) {
-		alert("Please fill in all required fields");
+	// Debug: Check which fields are empty
+	const requiredFields = {
+		student_employee_id: form.student_employee_id,
+		full_name: form.full_name, // Use full_name instead of first_name/last_name
+		age: form.age,
+		birthdate: form.birthdate,
+		address: form.address,
+		department: form.department, // Add department field
+		department_course: form.department_course,
+		contact_no: form.contact_no,
+		chief_complaints: form.chief_complaints,
+		diagnosis: form.diagnosis,
+		nurse_on_duty: form.nurse_on_duty,
+	};
+
+	console.log("Form validation check:", requiredFields);
+
+	// Find empty required fields
+	const emptyFields = Object.keys(requiredFields).filter((key) => {
+		const value = requiredFields[key];
+		// Special handling for age field (number)
+		if (key === "age") {
+			return !value || value <= 0;
+		}
+		// For other fields, check for empty strings
+		return !value || (typeof value === "string" && value.trim() === "");
+	});
+
+	if (emptyFields.length > 0) {
+		console.log("Empty required fields:", emptyFields);
+		console.log("Field values debug:");
+		emptyFields.forEach((field) => {
+			console.log(
+				`${field}:`,
+				`"${requiredFields[field]}"`,
+				typeof requiredFields[field]
+			);
+		});
+
+		alert(
+			`Please fill in all required fields. Missing: ${emptyFields.join(
+				", "
+			)}\n\nRequired fields: Student/Employee ID, Full Name, Age, Birthdate, Address, Department/Course, Contact Number, Chief Complaints, Diagnosis, and Nurse on Duty`
+		);
 		return;
 	}
 
@@ -351,6 +482,15 @@ const submitForm = async () => {
 const viewRecord = async (record) => {
 	selectedRecord.value = record;
 	showRecordModal.value = true;
+
+	// Fetch nurse notes for this record
+	try {
+		const response = await axios.get(`/ehr/${record.id}/nurse-notes`);
+		nurseNotes.value = response.data;
+	} catch (error) {
+		console.error("Error fetching nurse notes:", error);
+		nurseNotes.value = []; // Clear any previous notes on error
+	}
 };
 
 const openNurseNotes = async (record) => {
@@ -901,20 +1041,34 @@ const goToDashboard = () => {
 					<h2 class="text-lg font-medium text-neutral-900">Personal Information</h2>
 				</div>
 				<div class="p-6 space-y-6">
-					<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+					<!-- Full Name Field -->
+					<div>
+						<label class="form-label">Full Name *</label>
+						<input
+							v-model="form.full_name"
+							type="text"
+							class="form-input"
+							required
+							placeholder="Enter complete name (Last Name, First Name Middle Name)"
+						/>
+					</div>
+
+					<!-- Traditional Name Fields (Hidden but kept for compatibility) -->
+					<div class="grid grid-cols-1 md:grid-cols-3 gap-6" style="display: none">
 						<div>
 							<label class="form-label">Last Name *</label>
-							<input v-model="form.last_name" type="text" class="form-input" required />
+							<input v-model="form.last_name" type="text" class="form-input" />
 						</div>
 						<div>
 							<label class="form-label">First Name *</label>
-							<input v-model="form.first_name" type="text" class="form-input" required />
+							<input v-model="form.first_name" type="text" class="form-input" />
 						</div>
 						<div>
 							<label class="form-label">Middle Name</label>
 							<input v-model="form.middle_name" type="text" class="form-input" />
 						</div>
 					</div>
+
 					<div class="grid grid-cols-1 md:grid-cols-4 gap-6">
 						<div>
 							<label class="form-label">Age *</label>
@@ -932,8 +1086,8 @@ const goToDashboard = () => {
 							<input v-model="form.birthdate" type="date" class="form-input" required />
 						</div>
 						<div>
-							<label class="form-label">Civil Status *</label>
-							<select v-model="form.civil_status" class="form-input" required>
+							<label class="form-label">Civil Status</label>
+							<select v-model="form.civil_status" class="form-input">
 								<option
 									v-for="status in civilStatusOptions"
 									:key="status"
@@ -944,8 +1098,8 @@ const goToDashboard = () => {
 							</select>
 						</div>
 						<div>
-							<label class="form-label">Sex *</label>
-							<select v-model="form.sex" class="form-input" required>
+							<label class="form-label">Sex</label>
+							<select v-model="form.sex" class="form-input">
 								<option value="Male">Male</option>
 								<option value="Female">Female</option>
 							</select>
@@ -960,14 +1114,27 @@ const goToDashboard = () => {
 							required
 						></textarea>
 					</div>
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+					<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 						<div>
-							<label class="form-label">Department/Course *</label>
+							<label class="form-label">Department</label>
+							<select v-model="form.department" class="form-input">
+								<option value="">Select Department</option>
+								<option
+									v-for="department in departmentOptions"
+									:key="department"
+									:value="department"
+								>
+									{{ department }}
+								</option>
+							</select>
+						</div>
+						<div>
+							<label class="form-label">Course/Program</label>
 							<input
 								v-model="form.department_course"
 								type="text"
 								class="form-input"
-								required
+								placeholder="e.g., Bachelor of Science in Computer Science"
 							/>
 						</div>
 						<div>
@@ -1102,11 +1269,23 @@ const goToDashboard = () => {
 			<!-- Vital Signs Card -->
 			<div class="card">
 				<div class="px-6 py-4 border-b border-neutral-200">
-					<h2 class="text-lg font-medium text-neutral-900">
-						Vital Signs & Physical Measurements
-					</h2>
+					<div class="flex items-center justify-between">
+						<h2 class="text-lg font-medium text-neutral-900">
+							Vital Signs & Physical Measurements
+						</h2>
+						<button
+							type="button"
+							@click="showVitalSigns = !showVitalSigns"
+							class="text-sm text-blue-600 hover:text-blue-800 font-medium"
+						>
+							{{ showVitalSigns ? "Hide" : "Add Vital Signs" }}
+						</button>
+					</div>
+					<p class="text-sm text-neutral-500 mt-1">
+						Optional: Record patient's vital signs and physical measurements
+					</p>
 				</div>
-				<div class="p-6 space-y-6">
+				<div v-show="showVitalSigns" class="p-6 space-y-6">
 					<!-- Basic Measurements -->
 					<div class="grid grid-cols-1 md:grid-cols-4 gap-6">
 						<div>
@@ -1301,19 +1480,52 @@ const goToDashboard = () => {
 				<div class="p-6 space-y-4">
 					<!-- Quick Add from Available Medicines -->
 					<div v-if="medicines && medicines.length > 0">
-						<h4 class="text-sm font-medium text-neutral-900 mb-3">
+						<h4 class="text-sm font-medium text-neutral-900 mb-2">
 							Quick Add from Inventory:
 						</h4>
+						<p class="text-xs text-neutral-600 mb-3">
+							Click any medicine below to add it to the prescription. Dosage will be
+							automatically filled based on medicine strength.
+						</p>
 						<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
 							<button
 								v-for="medicine in medicines"
 								:key="medicine.id"
 								type="button"
 								@click="addMedicineFromInventory(medicine)"
-								class="p-3 text-left border border-neutral-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
+								:disabled="medicine.available_quantity <= 0"
+								:class="[
+									'p-3 text-left border rounded-lg transition-colors',
+									medicine.available_quantity <= 0
+										? 'border-red-200 bg-red-50 cursor-not-allowed opacity-60'
+										: 'border-neutral-200 hover:border-primary hover:bg-primary/5',
+								]"
 							>
 								<div class="font-medium text-neutral-900">{{ medicine.name }}</div>
-								<div class="text-sm text-neutral-500">{{ medicine.type }}</div>
+								<div class="text-sm text-neutral-500">
+									{{ medicine.type }}
+									<span v-if="medicine.dosage_strength">
+										• {{ medicine.dosage_strength }}</span
+									>
+									<span v-if="medicine.form"> • {{ medicine.form }}</span>
+								</div>
+								<div
+									v-if="medicine.dosage_strength || medicine.form"
+									class="text-xs text-blue-600 mt-1"
+								>
+									Dosage will auto-fill
+								</div>
+								<div
+									class="text-xs mt-1"
+									:class="
+										medicine.available_quantity <= 0 ? 'text-red-600' : 'text-green-600'
+									"
+								>
+									Stock: {{ medicine.available_quantity || 0 }}
+									<span v-if="medicine.available_quantity <= 0" class="font-medium"
+										>(Out of Stock)</span
+									>
+								</div>
 							</button>
 						</div>
 					</div>
@@ -1333,7 +1545,7 @@ const goToDashboard = () => {
 							<input
 								v-model="newMedicine.dosage"
 								type="text"
-								placeholder="Dosage (e.g., 500mg)"
+								placeholder="Dosage prescribed (e.g., 1 tablet, 5ml)"
 								class="form-input"
 							/>
 							<input
@@ -1369,10 +1581,19 @@ const goToDashboard = () => {
 								:key="index"
 								class="flex items-start justify-between p-4 bg-green-50 rounded-lg border border-green-200"
 							>
-								<div class="flex-1 grid grid-cols-1 md:grid-cols-4 gap-3">
+								<div class="flex-1 grid grid-cols-1 md:grid-cols-5 gap-3">
 									<div>
 										<label class="text-xs text-gray-600">Name:</label>
 										<div class="font-medium text-neutral-900">{{ medicine.name }}</div>
+									</div>
+									<div>
+										<label class="text-xs text-gray-600">Quantity:</label>
+										<input
+											v-model.number="medicine.quantity"
+											type="number"
+											min="1"
+											class="form-input text-sm mt-1"
+										/>
 									</div>
 									<div>
 										<label class="text-xs text-gray-600">Dosage:</label>
@@ -1427,14 +1648,23 @@ const goToDashboard = () => {
 			<!-- Equipment Card -->
 			<div class="card">
 				<div class="px-6 py-4 border-b border-neutral-200">
-					<h2 class="text-lg font-medium text-neutral-900">
-						Medical Equipment/Supplies Used
-					</h2>
+					<div class="flex items-center justify-between">
+						<h2 class="text-lg font-medium text-neutral-900">
+							Medical Equipment/Supplies Used
+						</h2>
+						<button
+							type="button"
+							@click="showEquipment = !showEquipment"
+							class="text-sm text-blue-600 hover:text-blue-800 font-medium"
+						>
+							{{ showEquipment ? "Hide" : "Add Equipment" }}
+						</button>
+					</div>
 					<p class="text-sm text-neutral-500 mt-1">
-						Record medical equipment and supplies utilized during consultation
+						Optional: Record medical equipment and supplies utilized during consultation
 					</p>
 				</div>
-				<div class="p-6 space-y-4">
+				<div v-show="showEquipment" class="p-6 space-y-4">
 					<!-- Quick Add from Available Equipment -->
 					<div v-if="equipment && equipment.length > 0">
 						<h4 class="text-sm font-medium text-neutral-900 mb-3">
@@ -1446,10 +1676,29 @@ const goToDashboard = () => {
 								:key="equipmentItem.id"
 								type="button"
 								@click="addEquipmentFromInventory(equipmentItem)"
-								class="p-3 text-left border border-neutral-200 rounded-lg hover:border-info hover:bg-info/5 transition-colors"
+								:disabled="equipmentItem.available_quantity <= 0"
+								:class="[
+									'p-3 text-left border rounded-lg transition-colors',
+									equipmentItem.available_quantity <= 0
+										? 'border-red-200 bg-red-50 cursor-not-allowed opacity-60'
+										: 'border-neutral-200 hover:border-info hover:bg-info/5',
+								]"
 							>
 								<div class="font-medium text-neutral-900">{{ equipmentItem.name }}</div>
 								<div class="text-sm text-neutral-500">{{ equipmentItem.type }}</div>
+								<div
+									class="text-xs"
+									:class="
+										equipmentItem.available_quantity <= 0
+											? 'text-red-600'
+											: 'text-green-600'
+									"
+								>
+									Stock: {{ equipmentItem.available_quantity || 0 }}
+									<span v-if="equipmentItem.available_quantity <= 0" class="font-medium"
+										>(Out of Stock)</span
+									>
+								</div>
 							</button>
 						</div>
 					</div>
@@ -1664,16 +1913,31 @@ const goToDashboard = () => {
 						<!-- Medicines -->
 						<div v-if="selectedRecord.medicines && selectedRecord.medicines.length">
 							<h4 class="font-medium text-gray-900 mb-2">Medicines Prescribed</h4>
-							<div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+							<div class="grid grid-cols-1 gap-2">
 								<div
 									v-for="medicine in selectedRecord.medicines"
 									:key="medicine.name"
-									class="flex justify-between items-center p-2 bg-green-50 rounded-lg border border-green-200"
+									class="p-3 bg-green-50 rounded-lg border border-green-200"
 								>
-									<span class="font-medium text-gray-900">{{ medicine.name }}</span>
-									<span class="text-sm text-gray-600 bg-white px-2 py-1 rounded border"
-										>{{ medicine.quantity }} pieces</span
-									>
+									<div class="flex justify-between items-start">
+										<div class="flex-1">
+											<div class="font-medium text-gray-900">{{ medicine.name }}</div>
+											<div v-if="medicine.dosage" class="text-sm text-gray-600 mt-1">
+												<span class="font-medium">Dosage:</span> {{ medicine.dosage }}
+											</div>
+											<div v-if="medicine.frequency" class="text-sm text-gray-600">
+												<span class="font-medium">Frequency:</span>
+												{{ medicine.frequency }}
+											</div>
+											<div v-if="medicine.duration" class="text-sm text-gray-600">
+												<span class="font-medium">Duration:</span> {{ medicine.duration }}
+											</div>
+										</div>
+										<span
+											class="text-sm text-gray-600 bg-white px-2 py-1 rounded border font-medium"
+											>Qty: {{ medicine.quantity || 1 }}</span
+										>
+									</div>
 								</div>
 							</div>
 						</div>
@@ -1691,6 +1955,36 @@ const goToDashboard = () => {
 									<span class="text-sm text-gray-600 bg-white px-2 py-1 rounded border"
 										>{{ equipmentItem.quantity }} pieces</span
 									>
+								</div>
+							</div>
+						</div>
+
+						<!-- Nurse Notes -->
+						<div v-if="nurseNotes && nurseNotes.length > 0">
+							<h4 class="font-medium text-gray-900 mb-2">Nurse Notes</h4>
+							<div class="space-y-3 max-h-48 overflow-y-auto">
+								<div
+									v-for="note in nurseNotes"
+									:key="note.id"
+									class="p-3 bg-yellow-50 rounded-lg border border-yellow-200"
+								>
+									<div class="flex justify-between items-start mb-2">
+										<div class="text-xs text-gray-500">
+											<span class="font-medium">{{ note.entered_by_nurse }}</span>
+											<span class="mx-1">•</span>
+											<span>{{ new Date(note.entry_date_time).toLocaleString() }}</span>
+										</div>
+									</div>
+									<p class="text-sm text-gray-900">{{ note.nurse_notes }}</p>
+									<div
+										v-if="note.doctor_orders"
+										class="mt-2 pt-2 border-t border-yellow-300"
+									>
+										<span class="text-xs font-medium text-gray-600"
+											>Doctor's Orders:</span
+										>
+										<p class="text-sm text-gray-800 mt-1">{{ note.doctor_orders }}</p>
+									</div>
 								</div>
 							</div>
 						</div>
