@@ -14,97 +14,154 @@
 
         body {
             font-family: Arial, sans-serif;
-            font-size: 12px;
-            line-height: 1.4;
-            color: #333;
+            font-size: 11px;
+            line-height: 1.3;
+            color: #000;
+            background: white;
+            padding: 0.3in;
+            margin: 0;
         }
 
-        .header {
+        .form-container {
+            width: 7.5in;
+            min-height: 18in;
+            margin: 0 auto;
+            background: white;
+            page-break-inside: avoid;
+            page-break-after: avoid;
+        }
+
+        .university-header {
+            display: flex;
+            align-items: flex-start;
+            padding: 15px 20px;
+            border-bottom: 2px solid #000;
+            background: white;
+            position: relative;
+        }
+
+        .logo-section {
+            position: absolute;
+            left: 20px;
+            top: 15px;
+        }
+
+        .logo-placeholder {
+            width: 60px;
+            height: 60px;
+            border: 2px solid #000;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
             text-align: center;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #333;
-            padding-bottom: 10px;
+            background: #f0f0f0;
         }
 
-        .header h1 {
+        .university-name {
+            flex: 1;
+            text-align: center;
+            padding: 0 100px;
+        }
+
+        .university-name h1 {
             font-size: 18px;
-            margin-bottom: 5px;
-        }
-
-        .header h2 {
-            font-size: 14px;
-            margin-bottom: 5px;
-        }
-
-        .form-number {
-            font-size: 10px;
-            text-align: right;
-            margin-bottom: 10px;
-        }
-
-        .section {
-            margin-bottom: 15px;
-        }
-
-        .section-title {
             font-weight: bold;
-            font-size: 13px;
-            margin-bottom: 8px;
-            border-bottom: 1px solid #666;
-            padding-bottom: 2px;
-        }
-
-        .field-row {
-            display: table;
-            width: 100%;
             margin-bottom: 5px;
+            letter-spacing: 1px;
         }
 
-        .field {
-            display: table-cell;
-            padding: 2px 10px 2px 0;
+        .department-info {
+            position: absolute;
+            right: 20px;
+            top: 15px;
+            text-align: right;
+            font-size: 10px;
+            width: 300px;
+        }
+
+        .department-info .main-dept {
+            font-weight: bold;
+            font-size: 11px;
+            margin-bottom: 3px;
+        }
+
+        .privacy-notice {
+            margin-top: 70px;
+            padding: 10px 20px;
+            font-size: 9px;
+            text-align: center;
+            font-style: italic;
+            border-bottom: 1px solid #000;
+            background: #f9f9f9;
+        }
+
+        .form-title {
+            text-align: center;
+            padding: 15px;
+            font-size: 16px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            border-bottom: 2px solid #000;
+        }
+
+        .section-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 0;
+        }
+
+        .section-header {
+            background-color: #90C695;
+            font-weight: bold;
+            text-align: center;
+            padding: 8px;
+            font-size: 11px;
+            border: 1px solid #000;
+        }
+
+        .section-table td,
+        .section-table th {
+            border: 1px solid #000;
+            padding: 6px 8px;
             vertical-align: top;
         }
 
         .field-label {
             font-weight: bold;
-            display: inline-block;
-            margin-right: 5px;
+            white-space: nowrap;
+            background-color: #f5f5f5;
         }
 
         .field-value {
-            border-bottom: 1px solid #333;
-            min-height: 18px;
-            display: inline-block;
-            min-width: 100px;
-            padding: 0 3px;
+            min-height: 20px;
+            background: white;
         }
 
-        .checkbox {
-            display: inline-block;
-            margin-right: 10px;
+        .complaints-section {
+            height: 80px;
         }
 
-        .checkbox input {
-            margin-right: 3px;
-        }
-
-        .table {
+        .medical-history-section {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 10px;
         }
 
-        .table th,
-        .table td {
-            border: 1px solid #333;
-            padding: 5px;
-            text-align: left;
+        .medical-history-section td {
+            border: 1px solid #000;
+            padding: 6px 8px;
+            vertical-align: middle;
         }
 
-        .table th {
-            background-color: #f0f0f0;
-            font-weight: bold;
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+        }
+
+        .checkbox-row input[type="checkbox"] {
+            margin-right: 5px;
+            transform: scale(1.2);
         }
 
         .vital-signs-table {
@@ -114,9 +171,10 @@
 
         .vital-signs-table th,
         .vital-signs-table td {
-            border: 1px solid #333;
-            padding: 4px;
+            border: 1px solid #000;
+            padding: 6px 4px;
             text-align: center;
+            font-size: 10px;
         }
 
         .vital-signs-table th {
@@ -124,339 +182,322 @@
             font-weight: bold;
         }
 
-        .text-area {
-            border: 1px solid #333;
-            min-height: 60px;
-            padding: 5px;
-            margin-top: 5px;
+        .diagnosis-section {
+            height: 120px;
+            padding: 8px;
+            vertical-align: top;
         }
 
-        .two-column {
-            display: table;
-            width: 100%;
+        .staff-section {
+            height: 100px;
         }
 
-        .column {
-            display: table-cell;
-            width: 50%;
-            padding-right: 10px;
-        }
-
-        .signature-section {
-            margin-top: 30px;
-            display: table;
-            width: 100%;
-        }
-
-        .signature-box {
-            display: table-cell;
-            width: 50%;
+        .form-footer {
             text-align: center;
             padding: 10px;
+            font-size: 10px;
+            border-top: 1px solid #000;
         }
 
-        .signature-line {
-            border-bottom: 1px solid #333;
-            height: 40px;
-            margin-bottom: 5px;
+        /* Specific column widths */
+        .narrow-col {
+            width: 15%;
         }
 
-        .medicines-equipment {
-            display: table;
+        .medium-col {
+            width: 25%;
+        }
+
+        .wide-col {
+            width: 35%;
+        }
+
+        .full-col {
             width: 100%;
         }
 
-        .medicines-section,
-        .equipment-section {
-            display: table-cell;
-            width: 50%;
-            padding-right: 10px;
+        /* Page configuration for PDF generation */
+        @page {
+            size: 8.5in 14in;
+            margin: 0.2in;
         }
 
-        .equipment-section {
-            padding-right: 0;
-            padding-left: 10px;
+        /* Page break for printing */
+        @media print {
+            @page {
+                size: 8.5in 20in;
+                margin: 0.2in;
+            }
+            
+            body {
+                padding: 0;
+                margin: 0;
+            }
+            
+            .form-container {
+                width: 100%;
+                min-height: 100%;
+                page-break-inside: avoid;
+                page-break-after: avoid;
+            }
+            
+            .section {
+                page-break-inside: avoid;
+            }
         }
 
-        .list-item {
-            padding: 3px 0;
-            border-bottom: 1px dotted #ccc;
+        .date-time-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0;
         }
 
-        .page-break {
-            page-break-after: always;
+        .id-field, .datetime-field {
+            display: flex;
+            align-items: center;
         }
+
+        .full-width-field {
+            width: 100%;
+        }
+
     </style>
 </head>
 
 <body>
-    <div class="form-number">FO-UHS-032</div>
+    <div class="form-container">
+        <!-- University Header -->
+        <div class="university-header">
+            <div class="logo-section">
+                <div class="logo-placeholder">
+                    UZ LOGO
+                </div>
+            </div>
+            <div class="department-info">
+                <div class="main-dept">SAFETY, HEALTH, AND ENVIRONMENT DEPARTMENT</div>
+                <div>HEALTH SERVICES – MAIN CAMPUS</div>
+                <div>Ground Floor, Edificio Academico Building,</div>
+                <div>Don Toribio Street, Tetuan, Zamboanga City 7000</div>
+                <div>(63)(62) 991-1135 Local 202</div>
+            </div>
+        </div>
 
-    <div class="header">
-        <h1>UNIVERSITY HEALTH SERVICES</h1>
-        <h2>PATIENT CONSULTATION RECORD</h2>
-    </div>
+        <!-- Privacy Notice -->
+        <div class="privacy-notice">
+            "As a personal Information Collector, Universidad de Zamboanga (UZ) respects your privacy, rights, and freedom. The University is committed to protect and respect your personal information. Your personal information will be handled with the utmost confidentiality."
+        </div>
 
-    <!-- Basic Information -->
-    <div class="section">
-        <div class="field-row">
-            <div class="field">
-                <span class="field-label">Student/Employee ID:</span>
-                <span class="field-value">{{ $record->student_employee_id }}</span>
-            </div>
-            <div class="field">
-                <span class="field-label">Date & Time:</span>
-                <span class="field-value">{{ \Carbon\Carbon::parse($record->consultation_date_time)->format('m/d/Y g:i A') }}</span>
-            </div>
+        <!-- Form Title -->
+        <div class="form-title">
+            PATIENT CONSULTATION RECORD
         </div>
-    </div>
 
-    <!-- Personal Information -->
-    <div class="section">
-        <div class="section-title">PERSONAL INFORMATION</div>
-        <div class="field-row">
-            <div class="field">
-                <span class="field-label">Last Name:</span>
-                <span class="field-value">{{ $record->last_name }}</span>
-            </div>
-            <div class="field">
-                <span class="field-label">First Name:</span>
-                <span class="field-value">{{ $record->first_name }}</span>
-            </div>
-            <div class="field">
-                <span class="field-label">Middle Name:</span>
-                <span class="field-value">{{ $record->middle_name }}</span>
-            </div>
-        </div>
-        <div class="field-row">
-            <div class="field">
-                <span class="field-label">Age:</span>
-                <span class="field-value">{{ $record->age }}</span>
-            </div>
-            <div class="field">
-                <span class="field-label">Birthdate:</span>
-                <span class="field-value">{{ \Carbon\Carbon::parse($record->birthdate)->format('m/d/Y') }}</span>
-            </div>
-            <div class="field">
-                <span class="field-label">Civil Status:</span>
-                <span class="field-value">{{ $record->civil_status }}</span>
-            </div>
-            <div class="field">
-                <span class="field-label">Sex:</span>
-                <span class="field-value">{{ $record->sex }}</span>
-            </div>
-        </div>
-        <div class="field-row">
-            <div class="field">
-                <span class="field-label">Address:</span>
-                <span class="field-value">{{ $record->address }}</span>
-            </div>
-        </div>
-        <div class="field-row">
-            <div class="field">
-                <span class="field-label">Department/Course:</span>
-                <span class="field-value">{{ $record->department_course }}</span>
-            </div>
-            <div class="field">
-                <span class="field-label">Contact No.:</span>
-                <span class="field-value">{{ $record->contact_no }}</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Guardian Information -->
-    @if($record->guardian_name)
-    <div class="section">
-        <div class="section-title">GUARDIAN INFORMATION</div>
-        <div class="field-row">
-            <div class="field">
-                <span class="field-label">Name of Guardian:</span>
-                <span class="field-value">{{ $record->guardian_name }}</span>
-            </div>
-            <div class="field">
-                <span class="field-label">Relationship:</span>
-                <span class="field-value">{{ $record->guardian_relationship }}</span>
-            </div>
-            <div class="field">
-                <span class="field-label">Contact No.:</span>
-                <span class="field-value">{{ $record->guardian_contact_no }}</span>
-            </div>
-        </div>
-    </div>
-    @endif
-
-    <!-- Chief Complaints -->
-    <div class="section">
-        <div class="section-title">CHIEF COMPLAINTS / REASONS FOR CONSULTATION</div>
-        <div class="text-area">{{ $record->chief_complaints }}</div>
-    </div>
-
-    <!-- Medical History -->
-    <div class="section">
-        <div class="section-title">MEDICAL HISTORY</div>
-        <div class="field-row">
-            <div class="checkbox">
-                <input type="checkbox" {{ $record->has_allergy ? 'checked' : '' }}> Allergy
-                @if($record->has_allergy && $record->allergy_specify)
-                    (Specify: {{ $record->allergy_specify }})
-                @endif
-            </div>
-            <div class="checkbox">
-                <input type="checkbox" {{ $record->has_hypertension ? 'checked' : '' }}> Hypertension
-            </div>
-            <div class="checkbox">
-                <input type="checkbox" {{ $record->has_diabetes ? 'checked' : '' }}> Diabetes
-            </div>
-            <div class="checkbox">
-                <input type="checkbox" {{ $record->has_asthma ? 'checked' : '' }}> Asthma
-                @if($record->has_asthma && $record->asthma_last_attack)
-                    (Last Attack: {{ \Carbon\Carbon::parse($record->asthma_last_attack)->format('m/d/Y') }})
-                @endif
-            </div>
-        </div>
-        @if($record->other_medical_history)
-        <div class="field-row">
-            <span class="field-label">Others:</span>
-            <span class="field-value">{{ $record->other_medical_history }}</span>
-        </div>
-        @endif
-    </div>
-
-    <!-- Vital Signs -->
-    <div class="section">
-        <div class="section-title">VITAL SIGNS</div>
-        
-        <!-- Basic Measurements -->
-        <div class="field-row">
-            <div class="field">
-                <span class="field-label">Weight (kg):</span>
-                <span class="field-value">{{ $record->weight }}</span>
-            </div>
-            <div class="field">
-                <span class="field-label">Height (cm):</span>
-                <span class="field-value">{{ $record->height }}</span>
-            </div>
-            <div class="field">
-                <span class="field-label">BMI:</span>
-                <span class="field-value">{{ $record->bmi }}</span>
-            </div>
-            @if($record->sex === 'Female' && $record->last_menstrual_period)
-            <div class="field">
-                <span class="field-label">LMP:</span>
-                <span class="field-value">{{ \Carbon\Carbon::parse($record->last_menstrual_period)->format('m/d/Y') }}</span>
-            </div>
+        <!-- Patient Information Section -->
+        <table class="section-table">
+            <tr>
+                <th class="section-header" colspan="6">PATIENT INFORMATION</th>
+            </tr>
+            <tr>
+                <td class="field-label narrow-col">Student/Employee ID No:</td>
+                <td class="field-value medium-col">{{ $record->student_employee_id }}</td>
+                <td class="field-label narrow-col">Date and Time:</td>
+                <td class="field-value wide-col" colspan="3">{{ \Carbon\Carbon::parse($record->consultation_date_time)->format('m/d/Y g:i A') }}</td>
+            </tr>
+            <tr>
+                <td class="field-label">Last Name:</td>
+                <td class="field-value">{{ $record->last_name }}</td>
+                <td class="field-label">First Name:</td>
+                <td class="field-value">{{ $record->first_name }}</td>
+                <td class="field-label">Middle Name:</td>
+                <td class="field-value">{{ $record->middle_name }}</td>
+            </tr>
+            <tr>
+                <td class="field-label">Age:</td>
+                <td class="field-value">{{ $record->age }}</td>
+                <td class="field-label">Birthdate:</td>
+                <td class="field-value">{{ \Carbon\Carbon::parse($record->birthdate)->format('m/d/Y') }}</td>
+                <td class="field-label">Civil Status:</td>
+                <td class="field-value">{{ $record->civil_status }}</td>
+            </tr>
+            <tr>
+                <td class="field-label">Sex:</td>
+                <td class="field-value">{{ $record->sex }}</td>
+                <td class="field-label">Address:</td>
+                <td class="field-value" colspan="3">{{ $record->address }}</td>
+            </tr>
+            <tr>
+                <td class="field-label">Department/Course:</td>
+                <td class="field-value" colspan="2">{{ $record->department_course }}</td>
+                <td class="field-label">Contact No.:</td>
+                <td class="field-value" colspan="2">{{ $record->contact_no }}</td>
+            </tr>
+            @if($record->guardian_name)
+            <tr>
+                <td class="field-label">Name of Guardian:</td>
+                <td class="field-value" colspan="2">{{ $record->guardian_name }}</td>
+                <td class="field-label">Relationship:</td>
+                <td class="field-value">{{ $record->guardian_relationship }}</td>
+                <td class="field-value">{{ $record->guardian_contact_no }}</td>
+            </tr>
             @endif
-        </div>
-
-        <!-- Vital Signs Table -->
-        <table class="vital-signs-table">
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Blood Pressure</th>
-                    <th>Heart Rate</th>
-                    <th>Respiratory Rate</th>
-                    <th>Temperature (°C)</th>
-                    <th>O2 Saturation (%)</th>
-                </tr>
-            </thead>
-            <tbody>
-                @if($record->vital_signs_time_1)
-                <tr>
-                    <td>{{ $record->vital_signs_time_1 }}</td>
-                    <td>{{ $record->blood_pressure_1 }}</td>
-                    <td>{{ $record->heart_rate_1 }}</td>
-                    <td>{{ $record->respiratory_rate_1 }}</td>
-                    <td>{{ $record->temperature_1 }}</td>
-                    <td>{{ $record->oxygen_saturation_1 }}</td>
-                </tr>
-                @endif
-                @if($record->vital_signs_time_2)
-                <tr>
-                    <td>{{ $record->vital_signs_time_2 }}</td>
-                    <td>{{ $record->blood_pressure_2 }}</td>
-                    <td>{{ $record->heart_rate_2 }}</td>
-                    <td>{{ $record->respiratory_rate_2 }}</td>
-                    <td>{{ $record->temperature_2 }}</td>
-                    <td>{{ $record->oxygen_saturation_2 }}</td>
-                </tr>
-                @endif
-            </tbody>
+            <tr>
+                <td class="field-label" colspan="6">Chief complaints/Reasons for Consultation:</td>
+            </tr>
+            <tr>
+                <td class="field-value complaints-section" colspan="6">{{ $record->chief_complaints }}</td>
+            </tr>
         </table>
-    </div>
 
-    <!-- Diagnosis -->
-    <div class="section">
-        <div class="section-title">DIAGNOSIS</div>
-        <div class="text-area">{{ $record->diagnosis }}</div>
-    </div>
-
-    <!-- Medicines and Equipment -->
-    <div class="section">
-        <div class="medicines-equipment">
-            <!-- Medicines -->
-            <div class="medicines-section">
-                <div class="section-title">MEDICINES PRESCRIBED</div>
-                @if($record->medicines && count($record->medicines) > 0)
-                    @foreach($record->medicines as $medicine)
-                    <div class="list-item">
-                        <strong>{{ $medicine['name'] }}</strong><br>
-                        <small>Dosage: {{ $medicine['dosage'] ?? 'N/A' }} | Frequency: {{ $medicine['frequency'] ?? 'N/A' }} | Duration: {{ $medicine['duration'] ?? 'N/A' }}</small>
+        <!-- Medical History Section -->
+        <table class="section-table">
+            <tr>
+                <th class="section-header" colspan="4">MEDICAL HISTORY</th>
+            </tr>
+            <tr>
+                <td style="width: 25%;">
+                    <div class="checkbox-row">
+                        <input type="checkbox" {{ $record->has_allergy ? 'checked' : '' }}>
+                        <span>Allergy:</span>
                     </div>
-                    @endforeach
-                @else
-                    <div class="list-item">No medicines prescribed</div>
-                @endif
-            </div>
-
-            <!-- Equipment -->
-            <div class="equipment-section">
-                <div class="section-title">MEDICAL EQUIPMENT/SUPPLIES USED</div>
-                @if($record->equipment && count($record->equipment) > 0)
-                    @foreach($record->equipment as $equipment)
-                    <div class="list-item">
-                        <strong>{{ $equipment['name'] }}</strong><br>
-                        <small>Purpose: {{ $equipment['purpose'] ?? 'N/A' }}</small>
+                    @if($record->has_allergy && $record->allergy_specify)
+                    <div style="margin-top: 5px; font-size: 9px;">
+                        Specify: {{ $record->allergy_specify }}
                     </div>
-                    @endforeach
-                @else
-                    <div class="list-item">No equipment used</div>
-                @endif
-            </div>
-        </div>
-    </div>
-
-    <!-- Staff Information -->
-    <div class="section">
-        <div class="section-title">STAFF INFORMATION</div>
-        <div class="field-row">
-            <div class="field">
-                <span class="field-label">Nurse on Duty:</span>
-                <span class="field-value">{{ $record->nurse_on_duty }}</span>
-            </div>
-            @if($record->physician_on_duty)
-            <div class="field">
-                <span class="field-label">Physician on Duty:</span>
-                <span class="field-value">{{ $record->physician_on_duty }}</span>
-            </div>
+                    @endif
+                </td>
+                <td style="width: 25%;">
+                    <div class="checkbox-row">
+                        <input type="checkbox" {{ $record->has_hypertension ? 'checked' : '' }}>
+                        <span>Hypertension</span>
+                    </div>
+                </td>
+                <td style="width: 25%;">
+                    <div class="checkbox-row">
+                        <input type="checkbox" {{ $record->has_diabetes ? 'checked' : '' }}>
+                        <span>Diabetes</span>
+                    </div>
+                </td>
+                <td style="width: 25%;">
+                    <div class="checkbox-row">
+                        <input type="checkbox" {{ $record->has_asthma ? 'checked' : '' }}>
+                        <span>Asthma:</span>
+                    </div>
+                    @if($record->has_asthma && $record->asthma_last_attack)
+                    <div style="margin-top: 5px; font-size: 9px;">
+                        Last Attack: {{ \Carbon\Carbon::parse($record->asthma_last_attack)->format('m/d/Y') }}
+                    </div>
+                    @endif
+                </td>
+            </tr>
+            @if($record->other_medical_history)
+            <tr>
+                <td colspan="4">
+                    <strong>Others:</strong> {{ $record->other_medical_history }}
+                </td>
+            </tr>
             @endif
-        </div>
-    </div>
+        </table>
 
-    <!-- Signatures -->
-    <div class="signature-section">
-        <div class="signature-box">
-            <div class="signature-line"></div>
-            <div>Nurse Signature</div>
-        </div>
-        <div class="signature-box">
-            <div class="signature-line"></div>
-            <div>Physician Signature</div>
-        </div>
-    </div>
+        <!-- Vital Signs Section -->
+        <table class="section-table">
+            <tr>
+                <th class="section-header" colspan="6">VITAL SIGNS</th>
+            </tr>
+            <tr>
+                <td rowspan="6" style="width: 15%; vertical-align: top;">
+                    <div style="margin-bottom: 10px;">
+                        <strong>WEIGHT:</strong><br>
+                        {{ $record->weight }} kg
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <strong>HEIGHT:</strong><br>
+                        {{ $record->height }} cm
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <strong>BMI:</strong><br>
+                        {{ $record->bmi }}
+                    </div>
+                </td>
+                <td rowspan="6" style="width: 15%; vertical-align: top;">
+                    @if($record->sex === 'Female' && $record->last_menstrual_period)
+                    <div>
+                        <strong>LAST MENSTRUAL PERIOD:</strong><br>
+                        <small>(For Female Only)</small><br>
+                        {{ \Carbon\Carbon::parse($record->last_menstrual_period)->format('m/d/Y') }}
+                    </div>
+                    @else
+                    <div>
+                        <strong>LAST MENSTRUAL PERIOD:</strong><br>
+                        <small>(For Female Only)</small>
+                    </div>
+                    @endif
+                </td>
+                <th style="width: 12%;">TIME:</th>
+                <th style="width: 12%;">TIME:</th>
+                <th style="width: 12%;">BP:</th>
+                <th style="width: 12%;">BP:</th>
+            </tr>
+            <tr>
+                <td>{{ $record->vital_signs_time_1 ?? '&nbsp;' }}</td>
+                <td>{{ $record->vital_signs_time_2 ?? '&nbsp;' }}</td>
+                <td>{{ $record->blood_pressure_1 ?? '&nbsp;' }}</td>
+                <td>{{ $record->blood_pressure_2 ?? '&nbsp;' }}</td>
+            </tr>
+            <tr>
+                <th>HR:</th>
+                <th>HR:</th>
+                <th>RR:</th>
+                <th>RR:</th>
+            </tr>
+            <tr>
+                <td>{{ $record->heart_rate_1 ?? '&nbsp;' }}</td>
+                <td>{{ $record->heart_rate_2 ?? '&nbsp;' }}</td>
+                <td>{{ $record->respiratory_rate_1 ?? '&nbsp;' }}</td>
+                <td>{{ $record->respiratory_rate_2 ?? '&nbsp;' }}</td>
+            </tr>
+            <tr>
+                <th>TEMP:</th>
+                <th>TEMP:</th>
+                <th>O2 SAT:</th>
+                <th>O2 SAT:</th>
+            </tr>
+            <tr>
+                <td>{{ $record->temperature_1 ?? '&nbsp;' }}</td>
+                <td>{{ $record->temperature_2 ?? '&nbsp;' }}</td>
+                <td>{{ $record->oxygen_saturation_1 ?? '&nbsp;' }}</td>
+                <td>{{ $record->oxygen_saturation_2 ?? '&nbsp;' }}</td>
+            </tr>
+        </table>
 
-    <div style="text-align: center; margin-top: 20px; font-size: 10px; color: #666;">
-        Generated on {{ now()->format('F d, Y \a\t g:i A') }}
+        <!-- Diagnosis Section -->
+        <table class="section-table">
+            <tr>
+                <td class="field-label" style="background-color: #90C695; font-weight: bold; text-align: center;">DIAGNOSIS:</td>
+            </tr>
+            <tr>
+                <td class="diagnosis-section">{{ $record->diagnosis }}</td>
+            </tr>
+        </table>
+
+        <!-- Staff Section -->
+        <table class="section-table">
+            <tr>
+                <td class="field-label staff-section" style="width: 50%;">
+                    <strong>NURSE ON DUTY:</strong><br><br>
+                    {{ $record->nurse_on_duty }}
+                </td>
+                <td class="field-label staff-section" style="width: 50%;">
+                    <strong>PHYSICIAN ON DUTY:</strong><br><br>
+                    {{ $record->physician_on_duty }}
+                </td>
+            </tr>
+        </table>
+
+        <!-- Form Footer -->
+        <div class="form-footer">
+            FO-UHS-032; Revision 2.0.0; February 18, 2025
+        </div>
     </div>
 </body>
 
