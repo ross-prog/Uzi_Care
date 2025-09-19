@@ -25,6 +25,7 @@ class PatientConsultationRecord extends Model
         'sex',
         'address',
         'department',
+        'campus',
         'department_course',
         'contact_no',
         

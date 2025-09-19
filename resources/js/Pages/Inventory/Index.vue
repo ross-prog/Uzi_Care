@@ -22,6 +22,7 @@ const currentFilters = reactive({
 	type: props.filters.type || "all",
 	search: props.filters.search || "",
 	per_page: props.filters.per_page || 15,
+	view: props.filters.view || "grouped",
 });
 
 const form = reactive({
@@ -29,7 +30,7 @@ const form = reactive({
 	quantity: "",
 	expiry_date: "",
 	batch_number: "",
-	supplier: "",
+	distributor: "",
 	cost_per_unit: "",
 	low_stock_threshold: 10,
 });
@@ -44,14 +45,18 @@ const newMedicineForm = reactive({
 	form: "",
 });
 
+// State for expanded rows (to show batch details)
+const expandedRows = ref(new Set());
+
 // Watch for filter changes and update URL
 watch(
-	[() => currentFilters.type, () => currentFilters.search, () => currentFilters.per_page],
+	[() => currentFilters.type, () => currentFilters.search, () => currentFilters.per_page, () => currentFilters.view],
 	() => {
 		const params = new URLSearchParams();
 		if (currentFilters.type !== "all") params.set("type", currentFilters.type);
 		if (currentFilters.search) params.set("search", currentFilters.search);
 		if (currentFilters.per_page !== 15) params.set("per_page", currentFilters.per_page);
+		if (currentFilters.view !== "grouped") params.set("view", currentFilters.view);
 
 		router.get(route("inventory.index"), Object.fromEntries(params), {
 			preserveState: true,
@@ -65,6 +70,19 @@ const clearFilters = () => {
 	currentFilters.type = "all";
 	currentFilters.search = "";
 	currentFilters.per_page = 15;
+	currentFilters.view = "grouped";
+};
+
+const toggleRowExpansion = (medicineId) => {
+	if (expandedRows.value.has(medicineId)) {
+		expandedRows.value.delete(medicineId);
+	} else {
+		expandedRows.value.add(medicineId);
+	}
+};
+
+const isRowExpanded = (medicineId) => {
+	return expandedRows.value.has(medicineId);
 };
 
 const openAddModal = () => {
@@ -79,7 +97,7 @@ const openEditModal = (item) => {
 		quantity: item.quantity,
 		expiry_date: item.expiry_date,
 		batch_number: item.batch_number || "",
-		supplier: item.supplier || "",
+		distributor: item.distributor || "",
 		cost_per_unit: item.cost_per_unit || "",
 		low_stock_threshold: item.low_stock_threshold,
 	});
@@ -104,7 +122,7 @@ const resetForm = () => {
 		quantity: "",
 		expiry_date: "",
 		batch_number: "",
-		supplier: "",
+		distributor: "",
 		cost_per_unit: "",
 		low_stock_threshold: 10,
 	});
@@ -396,6 +414,13 @@ const getAvailableItems = () => {
 							</svg>
 						</div>
 						<select
+							v-model="currentFilters.view"
+							class="px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+						>
+							<option value="grouped">Grouped View</option>
+							<option value="detailed">Detailed View</option>
+						</select>
+						<select
 							v-model="currentFilters.per_page"
 							class="px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
 						>
@@ -423,13 +448,174 @@ const getAvailableItems = () => {
 					<h2 class="text-lg font-medium text-neutral-900">
 						Current Inventory
 						<span class="text-sm text-neutral-500 font-normal">
-							({{ inventory.from }}-{{ inventory.to }} of {{ inventory.total }} items)
+							({{ currentFilters.view === 'grouped' ? 'Grouped by Medicine' : 'Individual Batches' }})
 						</span>
 					</h2>
 				</div>
 			</div>
 			<div class="overflow-x-auto">
-				<table class="min-w-full divide-y divide-neutral-200">
+				<!-- Grouped View -->
+				<table v-if="currentFilters.view === 'grouped'" class="min-w-full divide-y divide-neutral-200">
+					<thead class="bg-neutral-50">
+						<tr>
+							<th class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+								<span class="sr-only">Expand</span>
+							</th>
+							<th class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+								Medicine
+							</th>
+							<th class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+								Type
+							</th>
+							<th class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+								Total Quantity
+							</th>
+							<th class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+								Batches
+							</th>
+							<th class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+								Stock Status
+							</th>
+							<th class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+								Earliest Expiry
+							</th>
+							<th class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+								Avg Cost
+							</th>
+						</tr>
+					</thead>
+					<tbody class="bg-white divide-y divide-gray-200">
+						<template v-for="item in inventory.data" :key="item.medicine_id">
+							<!-- Main grouped row -->
+							<tr class="hover:bg-neutral-50 cursor-pointer" @click="toggleRowExpansion(item.medicine_id)">
+								<td class="px-6 py-4 whitespace-nowrap">
+									<button class="flex items-center text-gray-400 hover:text-gray-600">
+										<svg
+											:class="{ 'rotate-90': isRowExpanded(item.medicine_id) }"
+											class="w-4 h-4 transition-transform"
+											fill="none"
+											stroke="currentColor"
+											viewBox="0 0 24 24"
+										>
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+										</svg>
+									</button>
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap">
+									<div>
+										<div class="text-sm font-medium text-gray-900">{{ item.medicine?.name }}</div>
+										<div class="text-sm text-gray-500">{{ item.medicine?.description || "No description" }}</div>
+									</div>
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap">
+									<span
+										:class="[
+											'inline-flex px-2 py-1 text-xs font-semibold rounded-full',
+											['Equipment', 'Supply', 'Medical Supply'].includes(item.medicine?.type)
+												? 'bg-blue-100 text-blue-800'
+												: 'bg-green-100 text-green-800',
+										]"
+									>
+										{{ item.medicine?.type }}
+									</span>
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap">
+									<div class="text-sm font-medium text-gray-900">
+										{{ item.total_quantity }} {{ item.medicine?.unit }}
+									</div>
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap">
+									<div class="text-sm text-gray-900">{{ item.batch_count }} batches</div>
+									<div v-if="item.expiring_batches > 0" class="text-xs text-orange-600">
+										{{ item.expiring_batches }} expiring soon
+									</div>
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap">
+									<span
+										v-if="item.low_stock_batches > 0"
+										class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800"
+									>
+										{{ item.low_stock_batches }} Low Stock
+									</span>
+									<span
+										v-else
+										class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800"
+									>
+										In Stock
+									</span>
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+									{{ item.earliest_expiry ? new Date(item.earliest_expiry).toLocaleDateString() : '-' }}
+								</td>
+								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+									{{ item.average_cost ? `₱${parseFloat(item.average_cost).toFixed(2)}` : '-' }}
+								</td>
+							</tr>
+							
+							<!-- Expanded batch details -->
+							<tr v-if="isRowExpanded(item.medicine_id)" class="bg-gray-50">
+								<td colspan="8" class="px-6 py-4">
+									<div class="overflow-x-auto">
+										<table class="min-w-full divide-y divide-gray-200">
+											<thead class="bg-gray-100">
+												<tr>
+													<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Batch</th>
+													<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+													<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Expiry Date</th>
+													<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Distributor</th>
+													<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cost/Unit</th>
+													<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Stock Status</th>
+													<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+												</tr>
+											</thead>
+											<tbody class="divide-y divide-gray-200">
+												<tr v-for="batch in item.batches" :key="batch.id" class="hover:bg-gray-100">
+													<td class="px-4 py-2 text-sm text-gray-900">{{ batch.batch_number || '-' }}</td>
+													<td class="px-4 py-2 text-sm text-gray-900">
+														{{ batch.quantity }} {{ item.medicine?.unit }}
+														<div class="text-xs text-gray-500">Threshold: {{ batch.low_stock_threshold }}</div>
+													</td>
+													<td class="px-4 py-2 text-sm text-gray-900">
+														{{ new Date(batch.expiry_date).toLocaleDateString() }}
+													</td>
+													<td class="px-4 py-2 text-sm text-gray-900">{{ batch.distributor || '-' }}</td>
+													<td class="px-4 py-2 text-sm text-gray-900">{{ batch.cost_per_unit ? `₱${batch.cost_per_unit}` : '-' }}</td>
+													<td class="px-4 py-2">
+														<span
+															:class="[
+																'inline-flex px-2 py-1 text-xs font-semibold rounded-full',
+																getStockStatus(batch).class,
+															]"
+														>
+															{{ getStockStatus(batch).text }}
+														</span>
+													</td>
+													<td class="px-4 py-2 text-sm font-medium space-x-2">
+														<button
+															@click.stop="openEditModal(batch)"
+															class="text-blue-600 hover:text-blue-900"
+														>
+															Edit
+														</button>
+														<button 
+															@click.stop="deleteItem(batch)" 
+															class="text-red-600 hover:text-red-900"
+														>
+															Delete
+														</button>
+													</td>
+												</tr>
+											</tbody>
+										</table>
+									</div>
+								</td>
+							</tr>
+						</template>
+					</tbody>
+				</table>
+
+				<!-- Detailed View (Original) -->
+				<table v-else class="min-w-full divide-y divide-neutral-200">
 					<thead class="bg-neutral-50">
 						<tr>
 							<th
@@ -475,7 +661,7 @@ const getAvailableItems = () => {
 							<th
 								class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
 							>
-								Supplier
+								Distributor
 							</th>
 							<th
 								class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
@@ -560,7 +746,7 @@ const getAvailableItems = () => {
 								{{ item.batch_number || "-" }}
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-								{{ item.supplier || "-" }}
+								{{ item.distributor || "-" }}
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
 								{{ item.cost_per_unit ? `₱${item.cost_per_unit}` : "-" }}
@@ -973,9 +1159,9 @@ const getAvailableItems = () => {
 								/>
 							</div>
 							<div>
-								<label class="block text-sm font-medium text-gray-700">Supplier</label>
+								<label class="block text-sm font-medium text-gray-700">Distributor</label>
 								<input
-									v-model="form.supplier"
+									v-model="form.distributor"
 									type="text"
 									class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
 								/>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Inventory;
 use App\Models\Medicine;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
 class InventoryController extends Controller
@@ -14,8 +15,15 @@ class InventoryController extends Controller
         $perPage = $request->get('per_page', 15);
         $type = $request->get('type', 'all'); // all, medicines, supplies
         $search = $request->get('search', '');
+        $view = $request->get('view', 'grouped'); // grouped, detailed
 
+        $user = Auth::user();
         $query = Inventory::with('medicine');
+
+        // Filter by campus (only show inventory for user's campus unless admin)
+        if ($user->role !== 'admin') {
+            $query->where('campus', $user->campus);
+        }
 
         // Filter by type
         if ($type === 'medicines') {
@@ -36,30 +44,82 @@ class InventoryController extends Controller
                 $q->where('name', 'LIKE', "%{$search}%")
                   ->orWhere('type', 'LIKE', "%{$search}%");
             })->orWhere('batch_number', 'LIKE', "%{$search}%")
-              ->orWhere('supplier', 'LIKE', "%{$search}%");
+              ->orWhere('distributor', 'LIKE', "%{$search}%");
         }
 
-        $inventory = $query->orderBy('created_at', 'desc')
-            ->paginate($perPage)
-            ->withQueryString();
+        if ($view === 'grouped') {
+            // Group by medicine and calculate totals
+            $inventoryData = $query->get()->groupBy('medicine_id')->map(function($batches, $medicineId) {
+                $medicine = $batches->first()->medicine;
+                $totalQuantity = $batches->sum('quantity');
+                $batchCount = $batches->count();
+                $lowStockBatches = $batches->filter(function($batch) {
+                    return $batch->quantity <= $batch->low_stock_threshold;
+                })->count();
+                $expiringBatches = $batches->filter(function($batch) {
+                    return $batch->expiry_date <= now()->addDays(30);
+                })->count();
+                $earliestExpiry = $batches->min('expiry_date');
+                $averageCost = $batches->where('cost_per_unit', '>', 0)->avg('cost_per_unit');
+
+                return [
+                    'medicine_id' => $medicineId,
+                    'medicine' => $medicine,
+                    'total_quantity' => $totalQuantity,
+                    'batch_count' => $batchCount,
+                    'low_stock_batches' => $lowStockBatches,
+                    'expiring_batches' => $expiringBatches,
+                    'earliest_expiry' => $earliestExpiry,
+                    'average_cost' => $averageCost,
+                    'batches' => $batches->values(),
+                ];
+            })->values();
+
+            // Paginate grouped results manually
+            $currentPage = $request->get('page', 1);
+            $total = $inventoryData->count();
+            $offset = ($currentPage - 1) * $perPage;
+            $items = $inventoryData->slice($offset, $perPage)->values();
+
+            $inventory = new \Illuminate\Pagination\LengthAwarePaginator(
+                $items,
+                $total,
+                $perPage,
+                $currentPage,
+                [
+                    'path' => $request->url(),
+                    'pageName' => 'page',
+                ]
+            );
+            $inventory->withQueryString();
+        } else {
+            // Original detailed view
+            $inventory = $query->orderBy('created_at', 'desc')
+                ->paginate($perPage)
+                ->withQueryString();
+        }
 
         $medicines = Medicine::orderBy('name')->get();
         $supplies = Medicine::whereIn('type', ['Equipment', 'Supply', 'Medical Supply'])
             ->orderBy('name')->get();
 
-        // Get summary stats
+        // Get summary stats (campus-filtered for non-admin users)
+        $statsQuery = Auth::user()->role === 'admin' ? 
+            Inventory::query() : 
+            Inventory::where('campus', Auth::user()->campus);
+
         $stats = [
-            'total_items' => Inventory::count(),
-            'medicines_count' => Inventory::whereHas('medicine', function($q) {
+            'total_items' => $statsQuery->count(),
+            'medicines_count' => (clone $statsQuery)->whereHas('medicine', function($q) {
                 $q->where('type', '!=', 'Equipment')
                   ->where('type', '!=', 'Supply')
                   ->where('type', '!=', 'Medical Supply');
             })->count(),
-            'supplies_count' => Inventory::whereHas('medicine', function($q) {
+            'supplies_count' => (clone $statsQuery)->whereHas('medicine', function($q) {
                 $q->whereIn('type', ['Equipment', 'Supply', 'Medical Supply']);
             })->count(),
-            'low_stock_count' => Inventory::whereRaw('quantity <= low_stock_threshold')->count(),
-            'expiring_soon_count' => Inventory::where('expiry_date', '<=', now()->addDays(30))
+            'low_stock_count' => (clone $statsQuery)->whereRaw('quantity <= low_stock_threshold')->count(),
+            'expiring_soon_count' => (clone $statsQuery)->where('expiry_date', '<=', now()->addDays(30))
                 ->where('expiry_date', '>=', now())->count(),
         ];
 
@@ -72,6 +132,7 @@ class InventoryController extends Controller
                 'type' => $type,
                 'search' => $search,
                 'per_page' => $perPage,
+                'view' => $view,
             ]
         ]);
     }
@@ -83,7 +144,7 @@ class InventoryController extends Controller
             'quantity' => 'required|integer|min:0',
             'expiry_date' => 'required|date',
             'batch_number' => 'nullable|string',
-            'supplier' => 'nullable|string',
+            'distributor' => 'nullable|string',
             'cost_per_unit' => 'nullable|numeric|min:0',
             'low_stock_threshold' => 'required|integer|min:0',
         ]);
@@ -102,7 +163,7 @@ class InventoryController extends Controller
             'quantity' => 'required|integer|min:0',
             'expiry_date' => 'required|date',
             'batch_number' => 'nullable|string',
-            'supplier' => 'nullable|string',
+            'distributor' => 'nullable|string',
             'cost_per_unit' => 'nullable|numeric|min:0',
             'low_stock_threshold' => 'required|integer|min:0',
         ]);

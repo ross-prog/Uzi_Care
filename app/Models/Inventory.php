@@ -11,10 +11,11 @@ class Inventory extends Model
 
     protected $fillable = [
         'medicine_id',
+        'campus',
         'quantity',
         'expiry_date',
         'batch_number',
-        'supplier',
+        'distributor',
         'cost_per_unit',
         'low_stock_threshold',
     ];

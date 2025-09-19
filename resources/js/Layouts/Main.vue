@@ -1,10 +1,13 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Link, usePage } from '@inertiajs/vue3'
+import { Link, usePage, router } from '@inertiajs/vue3'
 
 const page = usePage()
 const showNotifications = ref(false)
 const showMobileMenu = ref(false)
+
+// Get auth user data
+const authUser = computed(() => page.props.auth?.user || null)
 
 // Get notification data from shared data
 const notificationData = computed(() => page.props.notificationData || {
@@ -18,8 +21,7 @@ const totalNotifications = computed(() =>
 )
 
 const logout = () => {
-    // For now, just redirect to home - in real app would handle auth
-    window.location.href = '/'
+    router.post(route('logout'))
 }
 </script>
 
@@ -51,7 +53,9 @@ const logout = () => {
                                 Dashboard
                             </Link>
                             
+                            <!-- AI Forecasting - Admin only -->
                             <Link 
+                                v-if="authUser?.permissions?.isAdmin"
                                 :href="route('ai.forecasting')" 
                                 :class="[
                                     'inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium',
@@ -63,7 +67,9 @@ const logout = () => {
                                 AI Forecasting
                             </Link>
                             
+                            <!-- EHR - Admin and Nurse -->
                             <Link 
+                                v-if="authUser?.permissions?.canManageRecords"
                                 :href="route('ehr.index')" 
                                 :class="[
                                     'inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium',
@@ -75,7 +81,9 @@ const logout = () => {
                                 EHR
                             </Link>
                             
+                            <!-- Inventory - Admin, Nurse, Inventory Manager -->
                             <Link 
+                                v-if="authUser?.permissions?.canViewInventory"
                                 :href="route('inventory.index')" 
                                 :class="[
                                     'inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium',
@@ -87,7 +95,23 @@ const logout = () => {
                                 Inventory
                             </Link>
                             
+                            <!-- Medicine Distribution - Admin and Inventory Manager -->
                             <Link 
+                                v-if="authUser?.role === 'admin' || authUser?.role === 'inventory_manager'"
+                                :href="route('medicine-distributions.index')" 
+                                :class="[
+                                    'inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium',
+                                    route().current('medicine-distributions.*') 
+                                        ? 'border-blue-500 text-gray-900' 
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                ]"
+                            >
+                                Distribution
+                            </Link>
+                            
+                            <!-- Reports - Admin and Nurse -->
+                            <Link 
+                                v-if="authUser?.permissions?.canDownloadReports"
                                 :href="route('reports.index')" 
                                 :class="[
                                     'inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium',
@@ -97,6 +121,20 @@ const logout = () => {
                                 ]"
                             >
                                 Reports
+                            </Link>
+
+                            <!-- User Management - Admin and Account Manager -->
+                            <Link 
+                                v-if="authUser?.permissions?.canManageAccounts"
+                                :href="route('users.index')" 
+                                :class="[
+                                    'inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium',
+                                    route().current('users.*') 
+                                        ? 'border-blue-500 text-gray-900' 
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                ]"
+                            >
+                                Users
                             </Link>
                         </div>
                     </div>
@@ -168,6 +206,14 @@ const logout = () => {
                             </div>
                         </div>
 
+                        <!-- User info and logout -->
+                        <div v-if="authUser" class="flex items-center space-x-3">
+                            <div class="text-right">
+                                <div class="text-sm font-medium text-gray-900">{{ authUser.name }}</div>
+                                <div class="text-xs text-gray-500">{{ authUser.roleDisplayName }} • {{ authUser.employee_id }}</div>
+                            </div>
+                        </div>
+
                         <!-- Logout button -->
                         <button 
                             @click="logout"
@@ -205,6 +251,13 @@ const logout = () => {
                     </Link>
                     <Link :href="route('inventory.index')" class="block pl-3 pr-4 py-2 border-l-4 text-base font-medium border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50 hover:border-gray-300">
                         Inventory
+                    </Link>
+                    <Link 
+                        v-if="authUser?.role === 'admin' || authUser?.role === 'inventory_manager'"
+                        :href="route('medicine-distributions.index')" 
+                        class="block pl-3 pr-4 py-2 border-l-4 text-base font-medium border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50 hover:border-gray-300"
+                    >
+                        Distribution
                     </Link>
                     <Link :href="route('reports.index')" class="block pl-3 pr-4 py-2 border-l-4 text-base font-medium border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50 hover:border-gray-300">
                         Reports
