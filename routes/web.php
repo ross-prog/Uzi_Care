@@ -16,11 +16,14 @@ Route::prefix('ehr')->name('ehr.')->group(function () {
     Route::get('/', [PatientConsultationController::class, 'index'])->name('index');
     Route::post('/search', [PatientConsultationController::class, 'search'])->name('search');
     Route::post('/', [PatientConsultationController::class, 'store'])->name('store');
+    Route::put('/{record}', [PatientConsultationController::class, 'update'])->name('update');
     Route::get('/{record}', [PatientConsultationController::class, 'show'])->name('show');
     Route::get('/{record}/pdf', [PatientConsultationController::class, 'downloadPdf'])->name('pdf');
     Route::get('/{record}/nurse-notes', [PatientConsultationController::class, 'getNurseNotes'])->name('nurse-notes');
     Route::post('/{record}/nurse-notes', [PatientConsultationController::class, 'addNurseNote'])->name('nurse-notes.store');
     Route::get('/{record}/nurse-notes-pdf', [PatientConsultationController::class, 'downloadNurseNotesPdf'])->name('nurse-notes.pdf');
+    Route::get('/{record}/audit-logs', [PatientConsultationController::class, 'getAuditLogs'])->name('audit-logs');
+    Route::get('/timeline/{studentEmployeeId}', [PatientConsultationController::class, 'getPatientTimeline'])->name('timeline');
 });
 
 // Patient Consultation Routes (same as EHR - maintaining backward compatibility)

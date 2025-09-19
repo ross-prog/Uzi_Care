@@ -17,7 +17,12 @@ const searchInitiated = ref(false);
 const selectedRecord = ref(null);
 const showRecordModal = ref(false);
 const showNurseNotesModal = ref(false);
+const showDetailedConsultationModal = ref(false);
+const showTimelineModal = ref(false);
 const nurseNotes = ref([]);
+const consultationAuditLogs = ref([]);
+const patientTimeline = ref([]);
+const activeDetailTab = ref("vitals");
 
 // Optional sections toggle
 const showVitalSigns = ref(false);
@@ -31,7 +36,6 @@ const form = reactive({
 	consultation_date_time: new Date().toISOString().slice(0, 16),
 
 	// Personal Information
-	full_name: "", // New combined name field
 	last_name: "",
 	first_name: "",
 	middle_name: "",
@@ -118,30 +122,110 @@ const calculatedBMI = computed(() => {
 	return "";
 });
 
+// Computed properties for date validation
+const maxBirthdate = computed(() => {
+	return new Date().toISOString().split("T")[0]; // Today's date
+});
+
+const minBirthdate = computed(() => {
+	// 120 years ago
+	const date = new Date();
+	date.setFullYear(date.getFullYear() - 120);
+	return date.toISOString().split("T")[0];
+});
+
+const birthdateFormatted = computed(() => {
+	if (form.birthdate) {
+		const date = new Date(form.birthdate);
+		return date.toLocaleDateString("en-US", {
+			year: "numeric",
+			month: "long",
+			day: "numeric",
+		});
+	}
+	return "";
+});
+
+const ageFromBirthdate = computed(() => {
+	if (form.birthdate) {
+		const today = new Date();
+		const birthDate = new Date(form.birthdate);
+		let age = today.getFullYear() - birthDate.getFullYear();
+		const monthDiff = today.getMonth() - birthDate.getMonth();
+
+		if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+			age--;
+		}
+
+		return age >= 0 ? age : 0;
+	}
+	return null;
+});
+
+// Function to determine consultation type
+const getConsultationType = (record) => {
+	// Check if this is a nurse consultation (diagnosis contains "Nurse consultation" or physician_on_duty is null)
+	if (record.diagnosis && record.diagnosis.includes("Nurse consultation")) {
+		return {
+			type: "Nurse Consultation",
+			label: "Nurse Consultation",
+			class: "bg-green-100 text-green-800",
+			badgeClass:
+				"inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800",
+			icon: "🩺",
+		};
+	}
+	// Check if it has vital signs or detailed medical data (indicating full medical consultation)
+	if (
+		record.vital_signs_time_1 ||
+		record.weight ||
+		record.height ||
+		record.physician_on_duty
+	) {
+		return {
+			type: "Medical Consultation",
+			label: "Medical Consultation",
+			class: "bg-blue-100 text-blue-800",
+			badgeClass:
+				"inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800",
+			icon: "🏥",
+		};
+	}
+	// Default to general consultation
+	return {
+		type: "General Consultation",
+		label: "General Consultation",
+		class: "bg-gray-100 text-gray-800",
+		badgeClass:
+			"inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800",
+		icon: "📋",
+	};
+};
+
 // Watch for BMI calculation
 watch([() => form.weight, () => form.height], () => {
 	form.bmi = calculatedBMI.value;
 });
 
-// Watch for full name changes and split into first_name, last_name
+// Watch for birthdate changes and auto-calculate age
 watch(
-	() => form.full_name,
-	(newFullName) => {
-		if (newFullName && newFullName.trim()) {
-			const nameParts = newFullName.trim().split(" ");
-			if (nameParts.length >= 2) {
-				// Assume last part is first name, everything before is last name
-				form.first_name = nameParts[nameParts.length - 1];
-				form.last_name = nameParts.slice(0, nameParts.length - 1).join(" ");
-			} else if (nameParts.length === 1) {
-				// Only one name provided, put it in first_name
-				form.first_name = nameParts[0];
-				form.last_name = "";
-			}
-		} else {
-			// Clear individual names if full name is empty
-			form.first_name = "";
-			form.last_name = "";
+	() => form.birthdate,
+	(newBirthdate) => {
+		if (newBirthdate) {
+			form.age = ageFromBirthdate.value;
+		}
+	}
+);
+
+// Watch for age changes and auto-suggest birthdate year (only if no birthdate set)
+watch(
+	() => form.age,
+	(newAge) => {
+		if (newAge && newAge > 0 && !form.birthdate) {
+			const currentYear = new Date().getFullYear();
+			const estimatedBirthYear = currentYear - newAge;
+			// Set suggested birthdate to January 1st of estimated birth year for easy adjustment
+			form.birthdate = `${estimatedBirthYear}-01-01`;
 		}
 	}
 );
@@ -207,7 +291,6 @@ const resetForm = () => {
 	Object.assign(form, {
 		student_employee_id: "",
 		consultation_date_time: new Date().toISOString().slice(0, 16),
-		full_name: "", // Add missing full_name field
 		last_name: "",
 		first_name: "",
 		middle_name: "",
@@ -422,7 +505,8 @@ const submitForm = async () => {
 	// Debug: Check which fields are empty
 	const requiredFields = {
 		student_employee_id: form.student_employee_id,
-		full_name: form.full_name, // Use full_name instead of first_name/last_name
+		first_name: form.first_name,
+		last_name: form.last_name,
 		age: form.age,
 		birthdate: form.birthdate,
 		address: form.address,
@@ -461,16 +545,50 @@ const submitForm = async () => {
 		alert(
 			`Please fill in all required fields. Missing: ${emptyFields.join(
 				", "
-			)}\n\nRequired fields: Student/Employee ID, Full Name, Age, Birthdate, Address, Department/Course, Contact Number, Chief Complaints, Diagnosis, and Nurse on Duty`
+			)}\n\nRequired fields: Student/Employee ID, First Name, Last Name, Age, Birthdate, Address, Department/Course, Contact Number, Chief Complaints, Diagnosis, and Nurse on Duty`
 		);
 		return;
 	}
 
 	try {
-		await axios.post("/ehr", form);
-		alert("Patient consultation record created successfully!");
+		// Check if record exists for this student ID
+		const existingRecordsResponse = await axios.post("/ehr/search", {
+			student_employee_id: form.student_employee_id,
+		});
+
+		const existingRecords = existingRecordsResponse.data.records || [];
+
+		if (existingRecords.length > 0) {
+			// Record exists - ask user if they want to add a new consultation
+			const shouldAddConsultation = confirm(
+				`A record already exists for Student/Employee ID: ${form.student_employee_id}\n\n` +
+					`Do you want to add a new consultation for this student?\n\n` +
+					`Click OK to add new consultation\n` +
+					`Click Cancel to update existing record`
+			);
+
+			if (shouldAddConsultation) {
+				// Add as new consultation (current behavior)
+				await axios.post("/ehr", form);
+				alert("New consultation added successfully!");
+			} else {
+				// Update existing record
+				const latestRecord = existingRecords[0]; // Get the most recent record
+				await axios.put(`/ehr/${latestRecord.id}`, form);
+				alert("Patient record updated successfully!");
+			}
+		} else {
+			// No existing record - create new one
+			await axios.post("/ehr", form);
+			alert("Patient consultation record created successfully!");
+		}
+
+		// Store the student ID before resetting the form
+		const submittedStudentId = form.student_employee_id;
 		closeAddModal();
-		if (searchQuery.value === form.student_employee_id) {
+
+		// Check if we should refresh the search results
+		if (searchQuery.value === submittedStudentId) {
 			searchPatient();
 		}
 	} catch (error) {
@@ -512,8 +630,64 @@ const addNurseNote = async () => {
 	}
 
 	try {
-		await axios.post(`/ehr/${selectedRecord.value.id}/nurse-notes`, nurseNoteForm);
-		alert("Nurse note added successfully!");
+		// Create a new consultation record instead of a nurse note
+		const consultationData = {
+			// Copy basic info from the selected record
+			student_employee_id: selectedRecord.value.student_employee_id,
+			consultation_date_time: new Date().toISOString(),
+			first_name: selectedRecord.value.first_name,
+			last_name: selectedRecord.value.last_name,
+			middle_name: selectedRecord.value.middle_name,
+			age: selectedRecord.value.age,
+			birthdate: selectedRecord.value.birthdate,
+			civil_status: selectedRecord.value.civil_status,
+			sex: selectedRecord.value.sex,
+			address: selectedRecord.value.address,
+			department_course: selectedRecord.value.department_course,
+			contact_no: selectedRecord.value.contact_no,
+			guardian_name: selectedRecord.value.guardian_name,
+			guardian_relationship: selectedRecord.value.guardian_relationship,
+			guardian_contact_no: selectedRecord.value.guardian_contact_no,
+
+			// Medical history from previous record
+			has_allergy: selectedRecord.value.has_allergy,
+			allergy_specify: selectedRecord.value.allergy_specify,
+			has_hypertension: selectedRecord.value.has_hypertension,
+			has_diabetes: selectedRecord.value.has_diabetes,
+			has_asthma: selectedRecord.value.has_asthma,
+			asthma_last_attack: selectedRecord.value.asthma_last_attack,
+			other_medical_history: selectedRecord.value.other_medical_history,
+
+			// New nurse consultation data
+			chief_complaints: nurseNoteForm.nurse_notes,
+			diagnosis: nurseNoteForm.doctor_orders || "Nurse consultation - follow-up care",
+			nurse_on_duty: nurseNoteForm.entered_by_nurse,
+			physician_on_duty: null,
+
+			// Empty vital signs for nurse consultation
+			vital_signs_time_1: null,
+			weight: null,
+			height: null,
+			last_menstrual_period: null,
+			blood_pressure_1: null,
+			heart_rate_1: null,
+			respiratory_rate_1: null,
+			temperature_1: null,
+			oxygen_saturation_1: null,
+			vital_signs_time_2: null,
+			blood_pressure_2: null,
+			heart_rate_2: null,
+			respiratory_rate_2: null,
+			temperature_2: null,
+			oxygen_saturation_2: null,
+
+			// Empty medicines and equipment
+			medicines: [],
+			equipment: [],
+		};
+
+		await axios.post("/ehr", consultationData);
+		alert("Nurse consultation added successfully!");
 
 		// Reset form
 		Object.assign(nurseNoteForm, {
@@ -523,11 +697,14 @@ const addNurseNote = async () => {
 			relationship: "",
 		});
 
-		// Refresh nurse notes
-		openNurseNotes(selectedRecord.value);
+		// Close modal and refresh search if needed
+		showNurseNotesModal.value = false;
+		if (searchQuery.value === selectedRecord.value.student_employee_id) {
+			searchPatient();
+		}
 	} catch (error) {
-		console.error("Error adding nurse note:", error);
-		alert("Error adding nurse note");
+		console.error("Error adding nurse consultation:", error);
+		alert("Error adding nurse consultation");
 	}
 };
 
@@ -581,6 +758,45 @@ const downloadNurseNotesPDF = async (record) => {
 	}
 };
 
+const openDetailedConsultationView = async (record) => {
+	selectedRecord.value = record;
+	activeDetailTab.value = "vitals";
+
+	try {
+		// Fetch audit logs for this consultation
+		const auditResponse = await axios.get(`/ehr/${record.id}/audit-logs`);
+		consultationAuditLogs.value = auditResponse.data;
+
+		// Fetch related nurse notes
+		const notesResponse = await axios.get(`/ehr/${record.id}/nurse-notes`);
+		nurseNotes.value = notesResponse.data;
+
+		showDetailedConsultationModal.value = true;
+	} catch (error) {
+		console.error("Error fetching consultation details:", error);
+		alert("Error loading consultation details");
+	}
+};
+
+const openPatientTimeline = async (record) => {
+	selectedRecord.value = record;
+
+	try {
+		// Fetch all consultations for this patient ID
+		const timelineResponse = await axios.get(
+			`/ehr/timeline/${record.student_employee_id}`
+		);
+		patientTimeline.value = timelineResponse.data.sort(
+			(a, b) => new Date(b.consultation_date_time) - new Date(a.consultation_date_time)
+		);
+
+		showTimelineModal.value = true;
+	} catch (error) {
+		console.error("Error fetching patient timeline:", error);
+		alert("Error loading patient timeline");
+	}
+};
+
 const goToDashboard = () => {
 	currentView.value = "dashboard";
 	searchQuery.value = "";
@@ -588,6 +804,45 @@ const goToDashboard = () => {
 	hasSearched.value = false;
 	searchSuccessful.value = false;
 	searchInitiated.value = false;
+};
+
+// Helper functions for date/time formatting
+const formatDateTime = (dateTime) => {
+	if (!dateTime) return "";
+	const date = new Date(dateTime);
+	return date.toLocaleString("en-US", {
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+		hour: "2-digit",
+		minute: "2-digit",
+		hour12: true,
+	});
+};
+
+const formatDate = (date) => {
+	if (!date) return "";
+	const d = new Date(date);
+	return d.toLocaleDateString("en-US", {
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+	});
+};
+
+const formatTime = (time) => {
+	if (!time) return "";
+	// If it's already a time string (HH:mm), return it
+	if (typeof time === "string" && time.includes(":")) {
+		return time;
+	}
+	// If it's a date/datetime, extract the time portion
+	const date = new Date(time);
+	return date.toLocaleTimeString("en-US", {
+		hour: "2-digit",
+		minute: "2-digit",
+		hour12: true,
+	});
 };
 </script>
 
@@ -880,7 +1135,7 @@ const goToDashboard = () => {
 						</button>
 					</div>
 				</div>
-				<div class="overflow-hidden">
+				<div class="overflow-x-auto">
 					<table class="min-w-full divide-y divide-neutral-200">
 						<thead class="bg-neutral-50">
 							<tr>
@@ -890,22 +1145,27 @@ const goToDashboard = () => {
 									Date & Time
 								</th>
 								<th
+									class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+								>
+									Type
+								</th>
+								<th
 									class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
 								>
 									Patient
 								</th>
 								<th
-									class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+									class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider hidden md:table-cell"
 								>
 									Chief Complaints
 								</th>
 								<th
-									class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+									class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider hidden lg:table-cell"
 								>
 									Nurse on Duty
 								</th>
 								<th
-									class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+									class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider min-w-[280px]"
 								>
 									Actions
 								</th>
@@ -914,7 +1174,18 @@ const goToDashboard = () => {
 						<tbody class="bg-white divide-y divide-neutral-200">
 							<tr v-for="record in searchResults" :key="record.id">
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">
-									{{ new Date(record.consultation_date_time).toLocaleString() }}
+									<div class="text-sm">
+										{{ new Date(record.consultation_date_time).toLocaleString() }}
+									</div>
+								</td>
+								<td class="px-4 py-4 whitespace-nowrap">
+									<span
+										:class="getConsultationType(record).class"
+										class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+									>
+										{{ getConsultationType(record).icon }}
+										{{ getConsultationType(record).type }}
+									</span>
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap">
 									<div>
@@ -927,29 +1198,43 @@ const goToDashboard = () => {
 										</div>
 									</div>
 								</td>
-								<td class="px-6 py-4 text-sm text-neutral-900">
+								<td class="px-4 py-4 text-sm text-neutral-900 hidden md:table-cell">
 									<div class="max-w-xs truncate">{{ record.chief_complaints }}</div>
 								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">
+								<td
+									class="px-4 py-4 whitespace-nowrap text-sm text-neutral-900 hidden lg:table-cell"
+								>
 									{{ record.nurse_on_duty }}
 								</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-									<div class="flex space-x-3">
+								<td class="px-6 py-4 text-sm font-medium min-w-[280px]">
+									<div class="flex flex-wrap gap-1 items-center">
 										<button
 											@click="viewRecord(record)"
-											class="text-primary hover:text-primary/80 font-medium"
+											class="text-xs px-2 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded font-medium"
 										>
 											View
 										</button>
 										<button
-											@click="openNurseNotes(record)"
-											class="text-success hover:text-success/80 font-medium"
+											@click="openDetailedConsultationView(record)"
+											class="text-xs px-2 py-1 bg-purple-50 text-purple-600 hover:bg-purple-100 rounded font-medium"
 										>
-											Nurse Notes
+											Details
+										</button>
+										<button
+											@click="openPatientTimeline(record)"
+											class="text-xs px-2 py-1 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded font-medium"
+										>
+											Timeline
+										</button>
+										<button
+											@click="openNurseNotes(record)"
+											class="text-xs px-2 py-1 bg-green-50 text-green-600 hover:bg-green-100 rounded font-medium"
+										>
+											+ Note
 										</button>
 										<button
 											@click="downloadPDF(record)"
-											class="text-info hover:text-info/80 font-medium"
+											class="text-xs px-2 py-1 bg-gray-50 text-gray-600 hover:bg-gray-100 rounded font-medium"
 										>
 											PDF
 										</button>
@@ -1041,31 +1326,36 @@ const goToDashboard = () => {
 					<h2 class="text-lg font-medium text-neutral-900">Personal Information</h2>
 				</div>
 				<div class="p-6 space-y-6">
-					<!-- Full Name Field -->
-					<div>
-						<label class="form-label">Full Name *</label>
-						<input
-							v-model="form.full_name"
-							type="text"
-							class="form-input"
-							required
-							placeholder="Enter complete name (Last Name, First Name Middle Name)"
-						/>
-					</div>
-
-					<!-- Traditional Name Fields (Hidden but kept for compatibility) -->
-					<div class="grid grid-cols-1 md:grid-cols-3 gap-6" style="display: none">
+					<!-- Name Fields -->
+					<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 						<div>
 							<label class="form-label">Last Name *</label>
-							<input v-model="form.last_name" type="text" class="form-input" />
+							<input
+								v-model="form.last_name"
+								type="text"
+								class="form-input"
+								required
+								placeholder="Enter last name"
+							/>
 						</div>
 						<div>
 							<label class="form-label">First Name *</label>
-							<input v-model="form.first_name" type="text" class="form-input" />
+							<input
+								v-model="form.first_name"
+								type="text"
+								class="form-input"
+								required
+								placeholder="Enter first name"
+							/>
 						</div>
 						<div>
 							<label class="form-label">Middle Name</label>
-							<input v-model="form.middle_name" type="text" class="form-input" />
+							<input
+								v-model="form.middle_name"
+								type="text"
+								class="form-input"
+								placeholder="Enter middle name (optional)"
+							/>
 						</div>
 					</div>
 
@@ -1079,11 +1369,59 @@ const goToDashboard = () => {
 								max="150"
 								class="form-input"
 								required
+								placeholder="Enter age"
+								:class="{ 'bg-green-50 border-green-300': ageFromBirthdate !== null }"
 							/>
+							<div class="mt-1">
+								<p v-if="ageFromBirthdate !== null" class="text-xs text-green-600">
+									✓ Auto-calculated from birthdate
+								</p>
+								<p v-else class="text-xs text-gray-500">
+									Age will auto-calculate from birthdate
+								</p>
+							</div>
 						</div>
 						<div>
 							<label class="form-label">Birthdate *</label>
-							<input v-model="form.birthdate" type="date" class="form-input" required />
+							<div class="relative">
+								<input
+									v-model="form.birthdate"
+									type="date"
+									class="form-input pl-10 pr-4"
+									required
+									:max="maxBirthdate"
+									:min="minBirthdate"
+									placeholder="yyyy-mm-dd"
+								/>
+								<div
+									class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"
+								>
+									<svg
+										class="h-5 w-5 text-gray-400"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+										/>
+									</svg>
+								</div>
+							</div>
+							<div class="mt-1 space-y-1">
+								<p v-if="birthdateFormatted" class="text-sm text-green-600">
+									📅 {{ birthdateFormatted }}
+								</p>
+								<p v-if="ageFromBirthdate !== null" class="text-sm text-blue-600">
+									🎂 Age: {{ ageFromBirthdate }} years old
+								</p>
+								<p v-if="!form.birthdate" class="text-xs text-gray-500">
+									Select birthdate to auto-calculate age
+								</p>
+							</div>
 						</div>
 						<div>
 							<label class="form-label">Civil Status</label>
@@ -2024,7 +2362,7 @@ const goToDashboard = () => {
 			>
 				<div class="mt-3">
 					<div class="flex justify-between items-center mb-4">
-						<h3 class="text-lg font-medium text-gray-900">Nurse Notes (FO-UHS-044)</h3>
+						<h3 class="text-lg font-medium text-gray-900">Add New Consultation</h3>
 						<button
 							@click="showNurseNotesModal = false"
 							class="text-gray-400 hover:text-gray-600"
@@ -2062,13 +2400,13 @@ const goToDashboard = () => {
 						</div>
 					</div>
 
-					<!-- Add New Note Form -->
+					<!-- Add New Consultation Form -->
 					<div class="border-b border-gray-200 pb-6 mb-6">
-						<h4 class="text-md font-medium text-gray-900 mb-4">Add New Note</h4>
+						<h4 class="text-md font-medium text-gray-900 mb-4">Add New Consultation</h4>
 						<div class="space-y-4">
 							<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 								<div>
-									<label class="form-label">Entered by Nurse *</label>
+									<label class="form-label">Nurse on Duty *</label>
 									<input
 										v-model="nurseNoteForm.entered_by_nurse"
 										type="text"
@@ -2086,72 +2424,764 @@ const goToDashboard = () => {
 								</div>
 							</div>
 							<div>
-								<label class="form-label">Nurse's Notes *</label>
+								<label class="form-label">Chief Complaints / Notes *</label>
 								<textarea
 									v-model="nurseNoteForm.nurse_notes"
 									rows="3"
 									class="form-input"
 									required
+									placeholder="Enter the reason for consultation or follow-up notes"
 								></textarea>
 							</div>
 							<div>
-								<label class="form-label">Doctor's Orders</label>
+								<label class="form-label">Diagnosis / Treatment Plan</label>
 								<textarea
 									v-model="nurseNoteForm.doctor_orders"
 									rows="2"
 									class="form-input"
+									placeholder="Enter diagnosis, treatment, or follow-up instructions"
 								></textarea>
 							</div>
 							<div class="flex justify-end">
-								<button @click="addNurseNote" class="btn-primary">Add Note</button>
-							</div>
-						</div>
-					</div>
-
-					<!-- Existing Notes -->
-					<div>
-						<h4 class="text-md font-medium text-gray-900 mb-4">Previous Notes</h4>
-						<div v-if="nurseNotes.length === 0" class="text-center py-8 text-gray-500">
-							No nurse notes recorded yet.
-						</div>
-						<div v-else class="space-y-4">
-							<div
-								v-for="note in nurseNotes"
-								:key="note.id"
-								class="border border-gray-200 rounded-lg p-4"
-							>
-								<div class="flex justify-between items-start mb-2">
-									<div class="text-sm text-gray-600">
-										<span class="font-medium">{{ note.entered_by_nurse }}</span>
-										<span class="mx-2">•</span>
-										<span>{{ new Date(note.entry_date_time).toLocaleString() }}</span>
-									</div>
-								</div>
-								<div class="space-y-2">
-									<div>
-										<span class="text-sm font-medium text-gray-700">Nurse's Notes:</span>
-										<p class="text-sm text-gray-900 mt-1">{{ note.nurse_notes }}</p>
-									</div>
-									<div v-if="note.doctor_orders">
-										<span class="text-sm font-medium text-gray-700"
-											>Doctor's Orders:</span
-										>
-										<p class="text-sm text-gray-900 mt-1">{{ note.doctor_orders }}</p>
-									</div>
-								</div>
+								<button @click="addNurseNote" class="btn-primary">
+									Add Consultation
+								</button>
 							</div>
 						</div>
 					</div>
 
 					<div class="flex justify-end space-x-4 mt-6 pt-4 border-t border-gray-200">
 						<button
-							@click="downloadNurseNotesPDF(selectedRecord)"
-							class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-						>
-							Download PDF
-						</button>
-						<button
 							@click="showNurseNotesModal = false"
+							class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+						>
+							Close
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Detailed Consultation View Modal -->
+		<div
+			v-if="showDetailedConsultationModal && selectedRecord"
+			class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"
+		>
+			<div
+				class="relative top-10 mx-auto p-5 border w-11/12 max-w-6xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto"
+			>
+				<div class="mt-3">
+					<div class="flex justify-between items-center mb-4">
+						<h3 class="text-lg font-medium text-gray-900">Consultation Details</h3>
+						<button
+							@click="showDetailedConsultationModal = false"
+							class="text-gray-400 hover:text-gray-600"
+						>
+							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M6 18L18 6M6 6l12 12"
+								/>
+							</svg>
+						</button>
+					</div>
+
+					<!-- Patient Info Header -->
+					<div class="bg-gray-50 p-4 rounded-lg mb-6">
+						<div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+							<div>
+								<span class="font-medium">Name:</span> {{ selectedRecord.first_name }}
+								{{ selectedRecord.middle_name }} {{ selectedRecord.last_name }}
+							</div>
+							<div><span class="font-medium">Age:</span> {{ selectedRecord.age }}</div>
+							<div>
+								<span class="font-medium">Department:</span>
+								{{ selectedRecord.department_course }}
+							</div>
+							<div>
+								<span class="font-medium">ID:</span>
+								{{ selectedRecord.student_employee_id }}
+							</div>
+							<div>
+								<span class="font-medium">Date:</span>
+								{{ formatDateTime(selectedRecord.consultation_date_time) }}
+							</div>
+							<div>
+								<span class="font-medium">Type:</span>
+								<span :class="getConsultationType(selectedRecord).badgeClass">
+									{{ getConsultationType(selectedRecord).label }}
+								</span>
+							</div>
+						</div>
+					</div>
+
+					<!-- Tab Navigation -->
+					<div class="border-b border-gray-200 mb-6">
+						<nav class="-mb-px flex space-x-8">
+							<button
+								@click="activeDetailTab = 'vitals'"
+								:class="[
+									activeDetailTab === 'vitals'
+										? 'border-blue-500 text-blue-600'
+										: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+									'py-2 px-1 border-b-2 font-medium text-sm',
+								]"
+							>
+								Vital Signs
+							</button>
+							<button
+								@click="activeDetailTab = 'diagnosis'"
+								:class="[
+									activeDetailTab === 'diagnosis'
+										? 'border-blue-500 text-blue-600'
+										: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+									'py-2 px-1 border-b-2 font-medium text-sm',
+								]"
+							>
+								Diagnosis & Treatment
+							</button>
+							<button
+								@click="activeDetailTab = 'history'"
+								:class="[
+									activeDetailTab === 'history'
+										? 'border-blue-500 text-blue-600'
+										: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+									'py-2 px-1 border-b-2 font-medium text-sm',
+								]"
+							>
+								Medical History
+							</button>
+							<button
+								@click="activeDetailTab = 'notes'"
+								:class="[
+									activeDetailTab === 'notes'
+										? 'border-blue-500 text-blue-600'
+										: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+									'py-2 px-1 border-b-2 font-medium text-sm',
+								]"
+							>
+								Notes & Orders
+							</button>
+							<button
+								@click="activeDetailTab = 'audit'"
+								:class="[
+									activeDetailTab === 'audit'
+										? 'border-blue-500 text-blue-600'
+										: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+									'py-2 px-1 border-b-2 font-medium text-sm',
+								]"
+							>
+								Audit Log
+							</button>
+						</nav>
+					</div>
+
+					<!-- Tab Content -->
+					<div v-if="activeDetailTab === 'vitals'" class="space-y-6">
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+							<!-- First Set of Vital Signs -->
+							<div
+								v-if="selectedRecord.vital_signs_time_1"
+								class="bg-blue-50 p-4 rounded-lg"
+							>
+								<h4 class="font-medium text-gray-900 mb-3">
+									First Reading - {{ formatTime(selectedRecord.vital_signs_time_1) }}
+								</h4>
+								<div class="grid grid-cols-2 gap-3 text-sm">
+									<div v-if="selectedRecord.blood_pressure_1">
+										<span class="font-medium">Blood Pressure:</span>
+										{{ selectedRecord.blood_pressure_1 }}
+									</div>
+									<div v-if="selectedRecord.heart_rate_1">
+										<span class="font-medium">Heart Rate:</span>
+										{{ selectedRecord.heart_rate_1 }} bpm
+									</div>
+									<div v-if="selectedRecord.respiratory_rate_1">
+										<span class="font-medium">Respiratory Rate:</span>
+										{{ selectedRecord.respiratory_rate_1 }} /min
+									</div>
+									<div v-if="selectedRecord.temperature_1">
+										<span class="font-medium">Temperature:</span>
+										{{ selectedRecord.temperature_1 }}°C
+									</div>
+									<div v-if="selectedRecord.oxygen_saturation_1">
+										<span class="font-medium">Oxygen Saturation:</span>
+										{{ selectedRecord.oxygen_saturation_1 }}%
+									</div>
+								</div>
+							</div>
+
+							<!-- Second Set of Vital Signs -->
+							<div
+								v-if="selectedRecord.vital_signs_time_2"
+								class="bg-green-50 p-4 rounded-lg"
+							>
+								<h4 class="font-medium text-gray-900 mb-3">
+									Second Reading - {{ formatTime(selectedRecord.vital_signs_time_2) }}
+								</h4>
+								<div class="grid grid-cols-2 gap-3 text-sm">
+									<div v-if="selectedRecord.blood_pressure_2">
+										<span class="font-medium">Blood Pressure:</span>
+										{{ selectedRecord.blood_pressure_2 }}
+									</div>
+									<div v-if="selectedRecord.heart_rate_2">
+										<span class="font-medium">Heart Rate:</span>
+										{{ selectedRecord.heart_rate_2 }} bpm
+									</div>
+									<div v-if="selectedRecord.respiratory_rate_2">
+										<span class="font-medium">Respiratory Rate:</span>
+										{{ selectedRecord.respiratory_rate_2 }} /min
+									</div>
+									<div v-if="selectedRecord.temperature_2">
+										<span class="font-medium">Temperature:</span>
+										{{ selectedRecord.temperature_2 }}°C
+									</div>
+									<div v-if="selectedRecord.oxygen_saturation_2">
+										<span class="font-medium">Oxygen Saturation:</span>
+										{{ selectedRecord.oxygen_saturation_2 }}%
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<!-- Physical Measurements -->
+						<div class="bg-gray-50 p-4 rounded-lg">
+							<h4 class="font-medium text-gray-900 mb-3">Physical Measurements</h4>
+							<div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+								<div v-if="selectedRecord.weight">
+									<span class="font-medium">Weight:</span> {{ selectedRecord.weight }} kg
+								</div>
+								<div v-if="selectedRecord.height">
+									<span class="font-medium">Height:</span> {{ selectedRecord.height }} cm
+								</div>
+								<div v-if="selectedRecord.bmi">
+									<span class="font-medium">BMI:</span> {{ selectedRecord.bmi }}
+								</div>
+								<div v-if="selectedRecord.last_menstrual_period">
+									<span class="font-medium">Last Menstrual Period:</span>
+									{{ formatDate(selectedRecord.last_menstrual_period) }}
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div v-if="activeDetailTab === 'diagnosis'" class="space-y-6">
+						<!-- Chief Complaints -->
+						<div class="bg-red-50 p-4 rounded-lg">
+							<h4 class="font-medium text-gray-900 mb-2">Chief Complaints</h4>
+							<p class="text-sm text-gray-700">
+								{{ selectedRecord.chief_complaints || "Not specified" }}
+							</p>
+						</div>
+
+						<!-- Diagnosis -->
+						<div class="bg-blue-50 p-4 rounded-lg">
+							<h4 class="font-medium text-gray-900 mb-2">Diagnosis</h4>
+							<p class="text-sm text-gray-700">
+								{{ selectedRecord.diagnosis || "Not specified" }}
+							</p>
+						</div>
+
+						<!-- Staff Information -->
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div class="bg-green-50 p-4 rounded-lg">
+								<h4 class="font-medium text-gray-900 mb-2">Nurse on Duty</h4>
+								<p class="text-sm text-gray-700">
+									{{ selectedRecord.nurse_on_duty || "Not specified" }}
+								</p>
+							</div>
+							<div class="bg-purple-50 p-4 rounded-lg">
+								<h4 class="font-medium text-gray-900 mb-2">Physician on Duty</h4>
+								<p class="text-sm text-gray-700">
+									{{ selectedRecord.physician_on_duty || "Not specified" }}
+								</p>
+							</div>
+						</div>
+
+						<!-- Medicines and Equipment -->
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div class="bg-yellow-50 p-4 rounded-lg">
+								<h4 class="font-medium text-gray-900 mb-3">Prescribed Medicines</h4>
+								<div
+									v-if="selectedRecord.medicines && selectedRecord.medicines.length > 0"
+									class="space-y-2"
+								>
+									<div
+										v-for="medicine in selectedRecord.medicines"
+										:key="medicine.id"
+										class="text-sm"
+									>
+										<span class="font-medium">{{ medicine.name }}</span>
+										<span v-if="medicine.quantity" class="text-gray-600">
+											- Qty: {{ medicine.quantity }}</span
+										>
+									</div>
+								</div>
+								<p v-else class="text-sm text-gray-600">No medicines prescribed</p>
+							</div>
+							<div class="bg-indigo-50 p-4 rounded-lg">
+								<h4 class="font-medium text-gray-900 mb-3">Equipment Used</h4>
+								<div
+									v-if="selectedRecord.equipment && selectedRecord.equipment.length > 0"
+									class="space-y-2"
+								>
+									<div
+										v-for="equipment in selectedRecord.equipment"
+										:key="equipment.id"
+										class="text-sm"
+									>
+										<span class="font-medium">{{ equipment.name }}</span>
+										<span v-if="equipment.quantity" class="text-gray-600">
+											- Qty: {{ equipment.quantity }}</span
+										>
+									</div>
+								</div>
+								<p v-else class="text-sm text-gray-600">No equipment used</p>
+							</div>
+						</div>
+					</div>
+
+					<div v-if="activeDetailTab === 'history'" class="space-y-6">
+						<!-- Allergies -->
+						<div class="bg-red-50 p-4 rounded-lg">
+							<h4 class="font-medium text-gray-900 mb-2">Allergies</h4>
+							<p v-if="selectedRecord.has_allergy" class="text-sm text-red-700">
+								<span class="font-medium">Yes:</span>
+								{{ selectedRecord.allergy_specify || "Not specified" }}
+							</p>
+							<p v-else class="text-sm text-gray-600">No known allergies</p>
+						</div>
+
+						<!-- Medical Conditions -->
+						<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+							<div class="bg-orange-50 p-4 rounded-lg">
+								<h4 class="font-medium text-gray-900 mb-2">Hypertension</h4>
+								<p
+									class="text-sm"
+									:class="
+										selectedRecord.has_hypertension ? 'text-orange-700' : 'text-gray-600'
+									"
+								>
+									{{ selectedRecord.has_hypertension ? "Yes" : "No" }}
+								</p>
+							</div>
+							<div class="bg-blue-50 p-4 rounded-lg">
+								<h4 class="font-medium text-gray-900 mb-2">Diabetes</h4>
+								<p
+									class="text-sm"
+									:class="selectedRecord.has_diabetes ? 'text-blue-700' : 'text-gray-600'"
+								>
+									{{ selectedRecord.has_diabetes ? "Yes" : "No" }}
+								</p>
+							</div>
+							<div class="bg-green-50 p-4 rounded-lg">
+								<h4 class="font-medium text-gray-900 mb-2">Asthma</h4>
+								<p
+									class="text-sm"
+									:class="selectedRecord.has_asthma ? 'text-green-700' : 'text-gray-600'"
+								>
+									{{ selectedRecord.has_asthma ? "Yes" : "No" }}
+								</p>
+								<p
+									v-if="selectedRecord.has_asthma && selectedRecord.asthma_last_attack"
+									class="text-xs text-gray-600 mt-1"
+								>
+									Last attack: {{ formatDate(selectedRecord.asthma_last_attack) }}
+								</p>
+							</div>
+						</div>
+
+						<!-- Other Medical History -->
+						<div class="bg-gray-50 p-4 rounded-lg">
+							<h4 class="font-medium text-gray-900 mb-2">Other Medical History</h4>
+							<p class="text-sm text-gray-700">
+								{{ selectedRecord.other_medical_history || "None specified" }}
+							</p>
+						</div>
+					</div>
+
+					<div v-if="activeDetailTab === 'notes'" class="space-y-6">
+						<!-- Related Nurse Notes -->
+						<div class="bg-blue-50 p-4 rounded-lg">
+							<h4 class="font-medium text-gray-900 mb-3">Related Nurse Notes</h4>
+							<div v-if="nurseNotes.length > 0" class="space-y-3">
+								<div
+									v-for="note in nurseNotes"
+									:key="note.id"
+									class="bg-white p-3 rounded border"
+								>
+									<div class="flex justify-between items-start mb-2">
+										<span class="text-sm font-medium">{{
+											formatDateTime(note.entry_date_time)
+										}}</span>
+										<span class="text-xs text-gray-500"
+											>by {{ note.entered_by_nurse }}</span
+										>
+									</div>
+									<div class="space-y-2 text-sm">
+										<div v-if="note.nurse_notes">
+											<span class="font-medium">Notes:</span>
+											<p class="mt-1 text-gray-700">{{ note.nurse_notes }}</p>
+										</div>
+										<div v-if="note.doctor_orders">
+											<span class="font-medium">Doctor Orders:</span>
+											<p class="mt-1 text-gray-700">{{ note.doctor_orders }}</p>
+										</div>
+									</div>
+								</div>
+							</div>
+							<p v-else class="text-sm text-gray-600">No related nurse notes</p>
+						</div>
+					</div>
+
+					<div v-if="activeDetailTab === 'audit'" class="space-y-6">
+						<!-- Audit Log -->
+						<div class="bg-gray-50 p-4 rounded-lg">
+							<h4 class="font-medium text-gray-900 mb-3">Consultation Audit Trail</h4>
+							<div v-if="consultationAuditLogs.length > 0" class="space-y-3">
+								<div
+									v-for="log in consultationAuditLogs"
+									:key="log.id"
+									class="bg-white p-3 rounded border"
+								>
+									<div class="flex justify-between items-start mb-2">
+										<div class="flex items-center space-x-2">
+											<span class="text-sm font-medium capitalize">{{ log.event }}</span>
+											<span
+												class="text-xs px-2 py-1 rounded-full"
+												:class="{
+													'bg-green-100 text-green-800': log.event === 'created',
+													'bg-blue-100 text-blue-800': log.event === 'updated',
+													'bg-red-100 text-red-800': log.event === 'deleted',
+													'bg-gray-100 text-gray-800': log.event === 'viewed',
+												}"
+											>
+												{{ log.event }}
+											</span>
+										</div>
+										<div class="text-right">
+											<div class="text-xs text-gray-500">
+												{{ formatDateTime(log.created_at) }}
+											</div>
+											<div class="text-xs text-gray-400">
+												{{ log.user_name }} ({{ log.user_role }})
+											</div>
+										</div>
+									</div>
+									<p class="text-sm text-gray-700 mb-2">{{ log.description }}</p>
+									<div
+										v-if="log.changes && Object.keys(log.changes).length > 0"
+										class="text-xs"
+									>
+										<div class="font-medium text-gray-600 mb-1">Changes:</div>
+										<div class="space-y-1">
+											<div
+												v-for="(change, field) in log.changes"
+												:key="field"
+												class="pl-2"
+											>
+												<span class="font-medium">{{ field }}:</span>
+												<span class="text-red-600">{{ change.old || "null" }}</span>
+												→
+												<span class="text-green-600">{{ change.new || "null" }}</span>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+							<p v-else class="text-sm text-gray-600">No audit logs available</p>
+						</div>
+					</div>
+
+					<!-- Modal Footer -->
+					<div
+						class="flex justify-between items-center mt-6 pt-4 border-t border-gray-200"
+					>
+						<div class="flex space-x-2">
+							<button @click="downloadPDF(selectedRecord)" class="btn-secondary">
+								Download PDF
+							</button>
+							<button @click="openNurseNotes(selectedRecord)" class="btn-secondary">
+								Add Note
+							</button>
+						</div>
+						<button
+							@click="showDetailedConsultationModal = false"
+							class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+						>
+							Close
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Patient Timeline Modal -->
+		<div
+			v-if="showTimelineModal && selectedRecord"
+			class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"
+		>
+			<div
+				class="relative top-10 mx-auto p-5 border w-11/12 max-w-6xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto"
+			>
+				<div class="mt-3">
+					<div class="flex justify-between items-center mb-4">
+						<h3 class="text-lg font-medium text-gray-900">
+							Patient Medical Timeline - {{ selectedRecord.first_name }}
+							{{ selectedRecord.middle_name }} {{ selectedRecord.last_name }}
+						</h3>
+						<button
+							@click="showTimelineModal = false"
+							class="text-gray-400 hover:text-gray-600"
+						>
+							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M6 18L18 6M6 6l12 12"
+								/>
+							</svg>
+						</button>
+					</div>
+
+					<!-- Patient Info Header -->
+					<div class="bg-gray-50 p-4 rounded-lg mb-6">
+						<div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+							<div>
+								<span class="font-medium">Patient ID:</span>
+								{{ selectedRecord.student_employee_id }}
+							</div>
+							<div>
+								<span class="font-medium">Name:</span> {{ selectedRecord.first_name }}
+								{{ selectedRecord.middle_name }} {{ selectedRecord.last_name }}
+							</div>
+							<div><span class="font-medium">Age:</span> {{ selectedRecord.age }}</div>
+							<div>
+								<span class="font-medium">Department:</span>
+								{{ selectedRecord.department_course }}
+							</div>
+						</div>
+						<div class="mt-2 text-sm text-gray-600">
+							<span class="font-medium">Total Consultations:</span>
+							{{ patientTimeline.length }}
+						</div>
+					</div>
+
+					<!-- Timeline -->
+					<div class="space-y-4">
+						<div v-if="patientTimeline.length === 0" class="text-center py-8">
+							<svg
+								class="w-12 h-12 text-gray-400 mx-auto mb-4"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+								/>
+							</svg>
+							<p class="text-gray-500">No consultation records found for this patient</p>
+						</div>
+
+						<div v-else class="relative">
+							<!-- Timeline line -->
+							<div class="absolute left-8 top-0 bottom-0 w-0.5 bg-gray-300"></div>
+
+							<!-- Timeline entries -->
+							<div
+								v-for="(consultation, index) in patientTimeline"
+								:key="consultation.id"
+								class="relative"
+							>
+								<!-- Timeline marker -->
+								<div class="flex items-start">
+									<div class="flex-shrink-0 relative">
+										<div
+											class="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow relative z-10"
+										></div>
+									</div>
+
+									<!-- Content -->
+									<div class="ml-6 pb-8">
+										<!-- Card -->
+										<div
+											class="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow"
+										>
+											<!-- Header -->
+											<div
+												class="px-4 py-3 border-b border-gray-200 bg-gray-50 rounded-t-lg"
+											>
+												<div class="flex justify-between items-start">
+													<div>
+														<h4 class="text-sm font-medium text-gray-900">
+															{{ formatDateTime(consultation.consultation_date_time) }}
+														</h4>
+														<div class="flex items-center space-x-2 mt-1">
+															<span :class="getConsultationType(consultation).badgeClass">
+																{{ getConsultationType(consultation).label }}
+															</span>
+															<span
+																v-if="consultation.nurse_notes_count > 0"
+																class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+															>
+																{{ consultation.nurse_notes_count }} note(s)
+															</span>
+														</div>
+													</div>
+													<div class="flex space-x-2">
+														<button
+															@click="openDetailedConsultationView(consultation)"
+															class="text-xs px-2 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded"
+														>
+															View Details
+														</button>
+														<button
+															@click="downloadPDF(consultation)"
+															class="text-xs px-2 py-1 bg-gray-50 text-gray-600 hover:bg-gray-100 rounded"
+														>
+															PDF
+														</button>
+													</div>
+												</div>
+											</div>
+
+											<!-- Content -->
+											<div class="px-4 py-3">
+												<!-- Chief Complaints -->
+												<div v-if="consultation.chief_complaints" class="mb-3">
+													<div
+														class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1"
+													>
+														Chief Complaints
+													</div>
+													<p class="text-sm text-gray-700">
+														{{ consultation.chief_complaints }}
+													</p>
+												</div>
+
+												<!-- Diagnosis -->
+												<div v-if="consultation.diagnosis" class="mb-3">
+													<div
+														class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1"
+													>
+														Diagnosis
+													</div>
+													<p class="text-sm text-gray-700">
+														{{ consultation.diagnosis }}
+													</p>
+												</div>
+
+												<!-- Quick Vital Signs -->
+												<div v-if="consultation.vital_signs_time_1" class="mb-3">
+													<div
+														class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1"
+													>
+														Vital Signs
+													</div>
+													<div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+														<div v-if="consultation.blood_pressure_1">
+															<span class="font-medium">BP:</span>
+															{{ consultation.blood_pressure_1 }}
+														</div>
+														<div v-if="consultation.heart_rate_1">
+															<span class="font-medium">HR:</span>
+															{{ consultation.heart_rate_1 }} bpm
+														</div>
+														<div v-if="consultation.temperature_1">
+															<span class="font-medium">Temp:</span>
+															{{ consultation.temperature_1 }}°C
+														</div>
+														<div v-if="consultation.respiratory_rate_1">
+															<span class="font-medium">RR:</span>
+															{{ consultation.respiratory_rate_1 }}/min
+														</div>
+													</div>
+												</div>
+
+												<!-- Staff -->
+												<div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+													<div v-if="consultation.nurse_on_duty">
+														<span class="font-medium text-gray-500">Nurse:</span>
+														<span class="text-gray-700">{{
+															consultation.nurse_on_duty
+														}}</span>
+													</div>
+													<div v-if="consultation.physician_on_duty">
+														<span class="font-medium text-gray-500">Physician:</span>
+														<span class="text-gray-700">{{
+															consultation.physician_on_duty
+														}}</span>
+													</div>
+												</div>
+
+												<!-- Medicines & Equipment Summary -->
+												<div
+													v-if="
+														(consultation.medicines &&
+															consultation.medicines.length > 0) ||
+														(consultation.equipment && consultation.equipment.length > 0)
+													"
+													class="mt-3 pt-3 border-t border-gray-100"
+												>
+													<div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+														<div
+															v-if="
+																consultation.medicines &&
+																consultation.medicines.length > 0
+															"
+														>
+															<span class="font-medium text-gray-500">Medicines:</span>
+															<span class="text-gray-700"
+																>{{ consultation.medicines.length }} prescribed</span
+															>
+														</div>
+														<div
+															v-if="
+																consultation.equipment &&
+																consultation.equipment.length > 0
+															"
+														>
+															<span class="font-medium text-gray-500">Equipment:</span>
+															<span class="text-gray-700"
+																>{{ consultation.equipment.length }} used</span
+															>
+														</div>
+													</div>
+												</div>
+											</div>
+
+											<!-- Footer with timestamps -->
+											<div
+												class="px-4 py-2 bg-gray-50 rounded-b-lg text-xs text-gray-500"
+											>
+												<div class="flex justify-between">
+													<span
+														>Created: {{ formatDateTime(consultation.created_at) }}</span
+													>
+													<span
+														v-if="consultation.updated_at !== consultation.created_at"
+													>
+														Updated: {{ formatDateTime(consultation.updated_at) }}
+													</span>
+												</div>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Modal Footer -->
+					<div class="flex justify-end space-x-4 mt-6 pt-4 border-t border-gray-200">
+						<button
+							@click="showTimelineModal = false"
 							class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
 						>
 							Close

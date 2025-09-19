@@ -95,10 +95,50 @@ class PatientConsultationRecord extends Model
         'equipment' => 'array',
     ];
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::created(function ($model) {
+            AuditLog::logEvent(
+                $model,
+                'created',
+                null,
+                $model->toArray(),
+                'Patient consultation record created'
+            );
+        });
+
+        static::updated(function ($model) {
+            AuditLog::logEvent(
+                $model,
+                'updated',
+                $model->getOriginal(),
+                $model->toArray(),
+                'Patient consultation record updated'
+            );
+        });
+
+        static::deleted(function ($model) {
+            AuditLog::logEvent(
+                $model,
+                'deleted',
+                $model->toArray(),
+                null,
+                'Patient consultation record deleted'
+            );
+        });
+    }
+
     // Relationships
     public function nurseNotes()
     {
         return $this->hasMany(NurseNote::class);
+    }
+
+    public function auditLogs()
+    {
+        return $this->morphMany(AuditLog::class, 'auditable')->orderBy('created_at', 'desc');
     }
 
     // Accessor for full name
