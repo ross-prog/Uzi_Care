@@ -62,19 +62,19 @@ class User extends Authenticatable
         return $this->role === 'admin';
     }
 
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === 'super_admin';
+    }
+
+    public function isMainCampusAdmin(): bool
+    {
+        return $this->role === 'admin' && $this->campus === 'Main Campus';
+    }
+
     public function isNurse(): bool
     {
         return $this->role === 'nurse';
-    }
-
-    public function isInventoryManager(): bool
-    {
-        return $this->role === 'inventory_manager';
-    }
-
-    public function isAccountManager(): bool
-    {
-        return $this->role === 'account_manager';
     }
 
     /**
@@ -90,23 +90,23 @@ class User extends Authenticatable
      */
     public function canViewInventory(): bool
     {
-        return in_array($this->role, ['admin', 'nurse', 'inventory_manager']);
+        return in_array($this->role, ['admin', 'nurse']);
     }
 
     /**
-     * Check if user can manage inventory
+     * Check if user can manage inventory (add, edit, delete items)
      */
     public function canManageInventory(): bool
     {
-        return in_array($this->role, ['admin', 'inventory_manager']);
+        return in_array($this->role, ['admin', 'nurse']); // Each campus manages their own inventory
     }
 
     /**
-     * Check if user can manage accounts
+     * Check if user can manage accounts (user creation) - ONLY super_admin
      */
     public function canManageAccounts(): bool
     {
-        return in_array($this->role, ['admin', 'account_manager']);
+        return $this->isSuperAdmin(); // Only super admin can manage users
     }
 
     /**
@@ -118,15 +118,54 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if user can generate inventory reports
+     */
+    public function canGenerateInventoryReports(): bool
+    {
+        return in_array($this->role, ['admin', 'nurse']); // Each campus can generate their own reports
+    }
+
+    /**
+     * Check if user can compile all campus reports (Main Campus only)
+     */
+    public function canCompileReports(): bool
+    {
+        return $this->isMainCampusAdmin(); // Only Main Campus admin can compile all reports
+    }
+
+    /**
+     * Check if user can distribute medicines (Main Campus only)
+     */
+    public function canDistributeMedicines(): bool
+    {
+        return $this->isMainCampusAdmin(); // Only Main Campus can distribute
+    }
+
+    /**
+     * Check if user can request medicine distributions
+     */
+    public function canRequestDistributions(): bool
+    {
+        return $this->role === 'nurse' && $this->campus !== 'Main Campus'; // Other campuses can request
+    }
+
+    /**
+     * Check if user can view statistics
+     */
+    public function canViewStatistics(): bool
+    {
+        return $this->role === 'admin'; // Admin of each campus can view their stats
+    }
+
+    /**
      * Get user's role display name
      */
     public function getRoleDisplayName(): string
     {
         return match($this->role) {
-            'admin' => 'Administrator',
-            'nurse' => 'Nurse',
-            'inventory_manager' => 'Inventory Manager',
-            'account_manager' => 'Account Manager',
+            'super_admin' => 'System Administrator',
+            'admin' => $this->campus === 'Main Campus' ? 'Head Administrator' : 'Administrator',
+            'nurse' => 'Head Nurse',
             default => 'Unknown'
         };
     }

@@ -15,8 +15,7 @@ class DatabaseSeeder extends Seeder
             AdminUsersSeeder::class,
             CampusStaffSeeder::class,
             MedicineSeeder::class,
-            InventorySeeder::class,
-            MedicineInventorySeeder::class,
+            MedicineInventorySeeder::class, // This handles all medicine and inventory creation per campus
             MedicineDistributionSeeder::class, // Add distributions after inventory is created
             PatientConsultationSeeder::class,
         ]);

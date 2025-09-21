@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\PatientConsultationRecord;
+use App\Exports\StatisticalReportExport;
+use App\Exports\PatientsReportExport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ReportsController extends Controller
 {
@@ -163,15 +166,11 @@ class ReportsController extends Controller
             }
 
             if ($format === 'excel' || $format === 'csv') {
-                // Generate CSV content
-                $csvContent = $this->generateStatisticalCSV($data, $month, $year);
+                // Generate Excel export
                 $monthName = Carbon::create($year, $month, 1)->format('F-Y');
-                $filename = "statistics-report-{$monthName}.csv";
+                $filename = "statistics-report-{$monthName}.xlsx";
                 
-                return response($csvContent, 200, [
-                    'Content-Type' => 'text/csv',
-                    'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-                ]);
+                return Excel::download(new StatisticalReportExport($data, $month, $year), $filename);
             }
 
             // Return JSON for client-side processing (fallback)
@@ -256,15 +255,40 @@ class ReportsController extends Controller
             }
 
             if ($format === 'excel' || $format === 'csv') {
-                // Generate CSV content
-                $csvContent = $this->generatePatientsCSV($patients, $month, $year);
+                // Prepare data for Excel export
+                $patientsData = $patients->map(function($patient) {
+                    $medicines = '';
+                    if (is_array($patient->medicines)) {
+                        $medicinesList = [];
+                        foreach ($patient->medicines as $medicine) {
+                            if (is_array($medicine)) {
+                                $medicinesList[] = ($medicine['name'] ?? '') . ' (' . ($medicine['dosage'] ?? '') . ')';
+                            } else {
+                                $medicinesList[] = $medicine;
+                            }
+                        }
+                        $medicines = implode('; ', $medicinesList);
+                    } else {
+                        $medicines = $patient->medicines ?: 'None prescribed';
+                    }
+
+                    return [
+                        'visit_date' => $patient->consultation_date_time,
+                        'patient_name' => $patient->full_name ?: ($patient->first_name . ' ' . $patient->last_name),
+                        'age' => $patient->age,
+                        'contact' => $patient->contact_no,
+                        'type_of_visit' => $patient->chief_complaints,
+                        'department' => $patient->department ?: 'Not Specified',
+                        'condition' => $patient->diagnosis,
+                        'medicine' => $medicines,
+                        'nurse' => $patient->nurse_on_duty
+                    ];
+                })->toArray();
+
                 $monthName = Carbon::create($year, $month, 1)->format('F-Y');
-                $filename = "patients-report-{$monthName}.csv";
+                $filename = "patients-report-{$monthName}.xlsx";
                 
-                return response($csvContent, 200, [
-                    'Content-Type' => 'text/csv',
-                    'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-                ]);
+                return Excel::download(new PatientsReportExport($patientsData, $month, $year), $filename);
             }
 
             // Get department distribution for summary
@@ -405,162 +429,5 @@ class ReportsController extends Controller
             });
 
         return $workload;
-    }
-
-    private function generateStatisticalCSV($data, $month, $year)
-    {
-        $output = fopen('php://temp', 'w+');
-        
-        // Add header information
-        fputcsv($output, ['UZI CARE CLINIC - Statistical Report']);
-        fputcsv($output, ['Month/Year:', Carbon::create($year, $month, 1)->format('F Y')]);
-        fputcsv($output, ['Generated:', Carbon::now()->format('F j, Y \a\t g:i A')]);
-        fputcsv($output, []); // Empty row
-
-        // Patient Statistics
-        fputcsv($output, ['PATIENT STATISTICS']);
-        fputcsv($output, ['Metric', 'Count']);
-        fputcsv($output, ['Total Patients', $data['patients']['total']]);
-        fputcsv($output, ['Monthly Visits', $data['patients']['thisMonth']]);
-        fputcsv($output, ['Today\'s Visits', $data['patients']['today']]);
-        fputcsv($output, []); // Empty row
-
-        // Visit Types
-        if (!empty($data['visitTypes'])) {
-            fputcsv($output, ['VISIT TYPES DISTRIBUTION']);
-            fputcsv($output, ['Visit Type', 'Count']);
-            foreach ($data['visitTypes'] as $type) {
-                // Handle both object and array format
-                $typeName = is_object($type) ? $type->type : $type['type'];
-                $typeCount = is_object($type) ? $type->count : $type['count'];
-                fputcsv($output, [$typeName, $typeCount]);
-            }
-            fputcsv($output, []); // Empty row
-        }
-
-        // Departments
-        if (!empty($data['departments'])) {
-            fputcsv($output, ['DEPARTMENT DISTRIBUTION']);
-            fputcsv($output, ['Department', 'Count']);
-            foreach ($data['departments'] as $dept) {
-                // Handle both object and array format
-                $deptName = is_object($dept) ? $dept->department : $dept['department'];
-                $deptCount = is_object($dept) ? $dept->count : $dept['count'];
-                fputcsv($output, [$deptName, $deptCount]);
-            }
-            fputcsv($output, []); // Empty row
-        }
-
-        // Top Conditions
-        if (!empty($data['topConditions'])) {
-            fputcsv($output, ['TOP MEDICAL CONDITIONS']);
-            fputcsv($output, ['Condition', 'Count']);
-            foreach ($data['topConditions'] as $condition) {
-                // Handle both object and array format
-                $conditionName = is_object($condition) ? $condition->condition : $condition['condition'];
-                $conditionCount = is_object($condition) ? $condition->count : $condition['count'];
-                fputcsv($output, [$conditionName, $conditionCount]);
-            }
-            fputcsv($output, []); // Empty row
-        }
-
-        // Medicines
-        if (!empty($data['medicines'])) {
-            fputcsv($output, ['MOST PRESCRIBED MEDICINES']);
-            fputcsv($output, ['Medicine', 'Count']);
-            foreach ($data['medicines'] as $medicine) {
-                // Handle both object and array format
-                $medicineName = is_object($medicine) ? ($medicine->name ?? '') : $medicine['name'];
-                $medicineCount = is_object($medicine) ? ($medicine->count ?? 0) : $medicine['count'];
-                fputcsv($output, [$medicineName, $medicineCount]);
-            }
-            fputcsv($output, []); // Empty row
-        }
-
-        // Nurses
-        if (!empty($data['nurses'])) {
-            fputcsv($output, ['NURSE WORKLOAD']);
-            fputcsv($output, ['Nurse', 'Patient Count', 'Efficiency %']);
-            foreach ($data['nurses'] as $nurse) {
-                // Handle both object and array format
-                $nurseName = is_object($nurse) ? ($nurse->name ?? '') : $nurse['name'];
-                $patientCount = is_object($nurse) ? ($nurse->patient_count ?? 0) : $nurse['patient_count'];
-                $efficiency = is_object($nurse) ? ($nurse->efficiency ?? 0) : $nurse['efficiency'];
-                fputcsv($output, [$nurseName, $patientCount, $efficiency]);
-            }
-        }
-
-        rewind($output);
-        $csv = stream_get_contents($output);
-        fclose($output);
-
-        return $csv;
-    }
-
-    private function generatePatientsCSV($patients, $month, $year)
-    {
-        $output = fopen('php://temp', 'w+');
-        
-        // Add header information
-        fputcsv($output, ['UZI CARE CLINIC - Patients Report']);
-        fputcsv($output, ['Month/Year:', Carbon::create($year, $month, 1)->format('F Y')]);
-        fputcsv($output, ['Generated:', Carbon::now()->format('F j, Y \a\t g:i A')]);
-        fputcsv($output, ['Total Records:', count($patients)]);
-        fputcsv($output, []); // Empty row
-
-        // Add table headers
-        fputcsv($output, [
-            'Date/Time',
-            'Patient Name',
-            'Student/Employee ID',
-            'Department',
-            'Age',
-            'Sex',
-            'Contact',
-            'Chief Complaints',
-            'Diagnosis',
-            'Medicines',
-            'Nurse on Duty',
-            'Physician on Duty'
-        ]);
-
-        // Add patient data
-        foreach ($patients as $patient) {
-            $medicines = '';
-            if (is_array($patient->medicines)) {
-                $medicinesList = [];
-                foreach ($patient->medicines as $medicine) {
-                    if (is_array($medicine)) {
-                        $medicinesList[] = ($medicine['name'] ?? '') . ' (' . ($medicine['dosage'] ?? '') . ')';
-                    } else {
-                        $medicinesList[] = $medicine;
-                    }
-                }
-                $medicines = implode('; ', $medicinesList);
-            } else {
-                $medicines = $patient->medicines ?: 'None prescribed';
-            }
-
-            fputcsv($output, [
-                Carbon::parse($patient->consultation_date_time)->format('M j, Y H:i'),
-                $patient->full_name ?: ($patient->first_name . ' ' . $patient->last_name),
-                $patient->student_employee_id,
-                $patient->department ?: 'Not Specified',
-                $patient->age,
-                $patient->sex,
-                $patient->contact_no,
-                $patient->chief_complaints,
-                $patient->diagnosis,
-                $medicines,
-                $patient->nurse_on_duty,
-                $patient->physician_on_duty
-            ]);
-        }
-
-        rewind($output);
-        $csv = stream_get_contents($output);
-        fclose($output);
-
-        return $csv;
     }
 }

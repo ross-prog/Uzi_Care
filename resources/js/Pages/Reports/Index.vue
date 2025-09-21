@@ -170,7 +170,7 @@ const exportPatientsReport = async (format = "pdf") => {
 			document.body.removeChild(link);
 			console.log("Patients PDF download initiated successfully!");
 		} else {
-			// Handle CSV export - server-side
+			// Handle Excel export - server-side
 			const params = new URLSearchParams({
 				...patientsFilters,
 				format: format,
@@ -185,7 +185,7 @@ const exportPatientsReport = async (format = "pdf") => {
 			const monthName = months.find((m) => m.value === selectedMonth.value)?.label;
 			const filename = `patients-report-${monthName.toLowerCase()}-${
 				selectedYear.value
-			}.csv`;
+			}.xlsx`;
 
 			const url = window.URL.createObjectURL(new Blob([response.data]));
 			const link = document.createElement("a");
@@ -224,7 +224,7 @@ const exportStatisticalReport = async (format = "pdf") => {
 			document.body.removeChild(link);
 			console.log("Statistical PDF download initiated successfully!");
 		} else {
-			// Handle Excel export (CSV) - existing functionality
+			// Handle Excel export - server-side
 			const params = new URLSearchParams({
 				format: format,
 				month: selectedMonth.value,
@@ -238,7 +238,7 @@ const exportStatisticalReport = async (format = "pdf") => {
 			const monthName = months.find((m) => m.value === selectedMonth.value)?.label;
 			const filename = `statistics-report-${monthName.toLowerCase()}-${
 				selectedYear.value
-			}.csv`;
+			}.xlsx`;
 
 			const url = window.URL.createObjectURL(new Blob([response.data]));
 			const link = document.createElement("a");
@@ -356,7 +356,7 @@ onMounted(() => {
 										d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
 									/>
 								</svg>
-								<span>CSV</span>
+								<span>Excel</span>
 							</button>
 						</div>
 
@@ -397,7 +397,7 @@ onMounted(() => {
 										d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
 									/>
 								</svg>
-								<span>CSV</span>
+								<span>Excel</span>
 							</button>
 						</div>
 					</div>

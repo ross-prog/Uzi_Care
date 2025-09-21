@@ -136,6 +136,28 @@ class UserManagementController extends Controller
     }
 
     /**
+     * Approve user account
+     */
+    public function approve(User $user)
+    {
+        $user->update([
+            'is_active' => true,
+            'email_verified_at' => now(),
+        ]);
+
+        return back()->with('success', 'User approved successfully.');
+    }
+
+    /**
+     * Reject user account
+     */
+    public function reject(User $user)
+    {
+        $user->delete();
+        return back()->with('success', 'User rejected and removed successfully.');
+    }
+
+    /**
      * Delete user
      */
     public function destroy(User $user)

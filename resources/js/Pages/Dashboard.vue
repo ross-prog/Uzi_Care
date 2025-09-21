@@ -9,12 +9,12 @@ const props = defineProps({
 });
 
 // Debug log to see what data we're receiving
-console.log('=== DASHBOARD DEBUG DATA ===');
-console.log('Stats:', props.stats);
-console.log('Low stock items count:', props.lowStockItems?.length);
-console.log('Low stock items:', props.lowStockItems);
-console.log('Nearing expiry count:', props.nearingExpiry?.length);
-console.log('Nearing expiry items:', props.nearingExpiry);
+console.log("=== DASHBOARD DEBUG DATA ===");
+console.log("Stats:", props.stats);
+console.log("Low stock items count:", props.lowStockItems?.length);
+console.log("Low stock items:", props.lowStockItems);
+console.log("Nearing expiry count:", props.nearingExpiry?.length);
+console.log("Nearing expiry items:", props.nearingExpiry);
 </script>
 
 <template>
@@ -24,7 +24,18 @@ console.log('Nearing expiry items:', props.nearingExpiry);
 		<!-- Page header -->
 		<div class="page-header">
 			<h1 class="page-title">Dashboard</h1>
-			<p class="page-subtitle">Welcome to UZI Care - Clinic Management System</p>
+			<p class="page-subtitle">
+				Welcome to UZI Care - Clinic Management System
+				<span
+					v-if="stats?.campus && stats?.userRole !== 'admin'"
+					class="text-primary font-medium"
+				>
+					({{ stats.campus }})
+				</span>
+				<span v-if="stats?.userRole === 'admin'" class="text-primary font-medium">
+					(System Administrator - All Campuses)
+				</span>
+			</p>
 		</div>
 
 		<!-- Stats cards -->
@@ -304,7 +315,11 @@ console.log('Nearing expiry items:', props.nearingExpiry);
 									{{ patient.student_employee_id }} - {{ patient.department_course }}
 								</p>
 								<p class="text-xs text-neutral-400 mt-1" v-if="patient.chief_complaints">
-									{{ patient.chief_complaints.length > 50 ? patient.chief_complaints.substring(0, 50) + '...' : patient.chief_complaints }}
+									{{
+										patient.chief_complaints.length > 50
+											? patient.chief_complaints.substring(0, 50) + "..."
+											: patient.chief_complaints
+									}}
 								</p>
 							</div>
 							<div class="text-right">
@@ -312,7 +327,12 @@ console.log('Nearing expiry items:', props.nearingExpiry);
 									{{ new Date(patient.consultation_date_time).toLocaleDateString() }}
 								</p>
 								<p class="text-xs text-neutral-500">
-									{{ new Date(patient.consultation_date_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }}
+									{{
+										new Date(patient.consultation_date_time).toLocaleTimeString([], {
+											hour: "2-digit",
+											minute: "2-digit",
+										})
+									}}
 								</p>
 							</div>
 						</div>

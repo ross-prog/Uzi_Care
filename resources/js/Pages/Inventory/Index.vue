@@ -1,5 +1,5 @@
 <script setup>
-import { Head } from "@inertiajs/vue3";
+import { Head, Link } from "@inertiajs/vue3";
 import { ref, reactive, watch } from "vue";
 import { router } from "@inertiajs/vue3";
 import axios from "axios";
@@ -10,6 +10,9 @@ const props = defineProps({
 	supplies: Array,
 	stats: Object,
 	filters: Object,
+	canGenerateReport: Boolean,
+	canCompileReports: Boolean,
+	canManageInventory: Boolean,
 });
 
 const showAddModal = ref(false);
@@ -31,7 +34,6 @@ const form = reactive({
 	expiry_date: "",
 	batch_number: "",
 	distributor: "",
-	cost_per_unit: "",
 	low_stock_threshold: 10,
 });
 
@@ -50,7 +52,12 @@ const expandedRows = ref(new Set());
 
 // Watch for filter changes and update URL
 watch(
-	[() => currentFilters.type, () => currentFilters.search, () => currentFilters.per_page, () => currentFilters.view],
+	[
+		() => currentFilters.type,
+		() => currentFilters.search,
+		() => currentFilters.per_page,
+		() => currentFilters.view,
+	],
 	() => {
 		const params = new URLSearchParams();
 		if (currentFilters.type !== "all") params.set("type", currentFilters.type);
@@ -98,7 +105,6 @@ const openEditModal = (item) => {
 		expiry_date: item.expiry_date,
 		batch_number: item.batch_number || "",
 		distributor: item.distributor || "",
-		cost_per_unit: item.cost_per_unit || "",
 		low_stock_threshold: item.low_stock_threshold,
 	});
 	showEditModal.value = true;
@@ -111,8 +117,8 @@ const closeModals = () => {
 	selectedItem.value = null;
 	resetForm();
 	// Reset new medicine form
-	Object.keys(newMedicineForm).forEach(key => {
-		newMedicineForm[key] = key === 'unit' ? 'tablet' : '';
+	Object.keys(newMedicineForm).forEach((key) => {
+		newMedicineForm[key] = key === "unit" ? "tablet" : "";
 	});
 };
 
@@ -123,7 +129,6 @@ const resetForm = () => {
 		expiry_date: "",
 		batch_number: "",
 		distributor: "",
-		cost_per_unit: "",
 		low_stock_threshold: 10,
 	});
 };
@@ -165,23 +170,25 @@ const createNewMedicine = async () => {
 	try {
 		const response = await axios.post("/medicines", newMedicineForm);
 		const newMedicine = response.data;
-		
+
 		// Reset new medicine form
-		Object.keys(newMedicineForm).forEach(key => {
-			newMedicineForm[key] = key === 'unit' ? 'tablet' : '';
+		Object.keys(newMedicineForm).forEach((key) => {
+			newMedicineForm[key] = key === "unit" ? "tablet" : "";
 		});
-		
+
 		// Set the newly created medicine in the inventory form
 		form.medicine_id = newMedicine.id;
 		showNewMedicineForm.value = false;
-		
+
 		alert("New medicine created successfully! Now add inventory details.");
-		
+
 		// Refresh the page to get the updated medicines list
 		window.location.reload();
 	} catch (error) {
 		console.error("Create medicine error:", error);
-		alert("Error creating medicine: " + (error.response?.data?.message || "Unknown error"));
+		alert(
+			"Error creating medicine: " + (error.response?.data?.message || "Unknown error")
+		);
 	}
 };
 
@@ -189,8 +196,8 @@ const toggleNewMedicineForm = () => {
 	showNewMedicineForm.value = !showNewMedicineForm.value;
 	if (!showNewMedicineForm.value) {
 		// Reset form when closing
-		Object.keys(newMedicineForm).forEach(key => {
-			newMedicineForm[key] = key === 'unit' ? 'tablet' : '';
+		Object.keys(newMedicineForm).forEach((key) => {
+			newMedicineForm[key] = key === "unit" ? "tablet" : "";
 		});
 	}
 };
@@ -245,7 +252,29 @@ const getAvailableItems = () => {
 						Track medicine stock levels and expiry dates
 					</p>
 				</div>
-				<button @click="openAddModal" class="btn-primary">Add Item</button>
+				<div class="space-x-3">
+					<Link
+						v-if="canGenerateReport"
+						:href="route('inventory.generate-report')"
+						class="btn-secondary"
+					>
+						Generate Report
+					</Link>
+					<Link
+						v-if="canCompileReports"
+						:href="route('monthly-reports.index')"
+						class="btn-secondary"
+					>
+						View All Reports
+					</Link>
+					<button 
+						v-if="canManageInventory"
+						@click="openAddModal" 
+						class="btn-primary"
+					>
+						Add Item
+					</button>
+				</div>
 			</div>
 		</div>
 
@@ -448,46 +477,72 @@ const getAvailableItems = () => {
 					<h2 class="text-lg font-medium text-neutral-900">
 						Current Inventory
 						<span class="text-sm text-neutral-500 font-normal">
-							({{ currentFilters.view === 'grouped' ? 'Grouped by Medicine' : 'Individual Batches' }})
+							({{
+								currentFilters.view === "grouped"
+									? "Grouped by Medicine"
+									: "Individual Batches"
+							}})
 						</span>
 					</h2>
 				</div>
 			</div>
 			<div class="overflow-x-auto">
 				<!-- Grouped View -->
-				<table v-if="currentFilters.view === 'grouped'" class="min-w-full divide-y divide-neutral-200">
+				<table
+					v-if="currentFilters.view === 'grouped'"
+					class="min-w-full divide-y divide-neutral-200"
+				>
 					<thead class="bg-neutral-50">
 						<tr>
-							<th class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+							<th
+								class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+							>
 								<span class="sr-only">Expand</span>
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+							<th
+								class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+							>
 								Medicine
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+							<th
+								class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+							>
 								Type
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+							<th
+								class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+							>
 								Total Quantity
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+							<th
+								class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+							>
 								Batches
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+							<th
+								class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+							>
 								Stock Status
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+							<th
+								class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+							>
 								Earliest Expiry
 							</th>
-							<th class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-								Avg Cost
+							<th
+								class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+							>
+								Latest Added
 							</th>
 						</tr>
 					</thead>
 					<tbody class="bg-white divide-y divide-gray-200">
 						<template v-for="item in inventory.data" :key="item.medicine_id">
 							<!-- Main grouped row -->
-							<tr class="hover:bg-neutral-50 cursor-pointer" @click="toggleRowExpansion(item.medicine_id)">
+							<tr
+								class="hover:bg-neutral-50 cursor-pointer"
+								@click="toggleRowExpansion(item.medicine_id)"
+							>
 								<td class="px-6 py-4 whitespace-nowrap">
 									<button class="flex items-center text-gray-400 hover:text-gray-600">
 										<svg
@@ -497,21 +552,32 @@ const getAvailableItems = () => {
 											stroke="currentColor"
 											viewBox="0 0 24 24"
 										>
-											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M9 5l7 7-7 7"
+											/>
 										</svg>
 									</button>
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap">
 									<div>
-										<div class="text-sm font-medium text-gray-900">{{ item.medicine?.name }}</div>
-										<div class="text-sm text-gray-500">{{ item.medicine?.description || "No description" }}</div>
+										<div class="text-sm font-medium text-gray-900">
+											{{ item.medicine?.name }}
+										</div>
+										<div class="text-sm text-gray-500">
+											{{ item.medicine?.description || "No description" }}
+										</div>
 									</div>
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap">
 									<span
 										:class="[
 											'inline-flex px-2 py-1 text-xs font-semibold rounded-full',
-											['Equipment', 'Supply', 'Medical Supply'].includes(item.medicine?.type)
+											['Equipment', 'Supply', 'Medical Supply'].includes(
+												item.medicine?.type
+											)
 												? 'bg-blue-100 text-blue-800'
 												: 'bg-green-100 text-green-800',
 										]"
@@ -545,13 +611,21 @@ const getAvailableItems = () => {
 									</span>
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-									{{ item.earliest_expiry ? new Date(item.earliest_expiry).toLocaleDateString() : '-' }}
+									{{
+										item.earliest_expiry
+											? new Date(item.earliest_expiry).toLocaleDateString()
+											: "-"
+									}}
 								</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-									{{ item.average_cost ? `₱${parseFloat(item.average_cost).toFixed(2)}` : '-' }}
+									{{
+										item.latest_added
+											? new Date(item.latest_added).toLocaleDateString()
+											: "-"
+									}}
 								</td>
 							</tr>
-							
+
 							<!-- Expanded batch details -->
 							<tr v-if="isRowExpanded(item.medicine_id)" class="bg-gray-50">
 								<td colspan="8" class="px-6 py-4">
@@ -559,27 +633,71 @@ const getAvailableItems = () => {
 										<table class="min-w-full divide-y divide-gray-200">
 											<thead class="bg-gray-100">
 												<tr>
-													<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Batch</th>
-													<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
-													<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Expiry Date</th>
-													<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Distributor</th>
-													<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cost/Unit</th>
-													<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Stock Status</th>
-													<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+													<th
+														class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase"
+													>
+														Batch
+													</th>
+													<th
+														class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase"
+													>
+														Quantity
+													</th>
+													<th
+														class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase"
+													>
+														Expiry Date
+													</th>
+													<th
+														class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase"
+													>
+														Distributor
+													</th>
+													<th
+														class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase"
+													>
+														Date Added
+													</th>
+													<th
+														class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase"
+													>
+														Stock Status
+													</th>
+													<th
+														class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase"
+													>
+														Actions
+													</th>
 												</tr>
 											</thead>
 											<tbody class="divide-y divide-gray-200">
-												<tr v-for="batch in item.batches" :key="batch.id" class="hover:bg-gray-100">
-													<td class="px-4 py-2 text-sm text-gray-900">{{ batch.batch_number || '-' }}</td>
+												<tr
+													v-for="batch in item.batches"
+													:key="batch.id"
+													class="hover:bg-gray-100"
+												>
+													<td class="px-4 py-2 text-sm text-gray-900">
+														{{ batch.batch_number || "-" }}
+													</td>
 													<td class="px-4 py-2 text-sm text-gray-900">
 														{{ batch.quantity }} {{ item.medicine?.unit }}
-														<div class="text-xs text-gray-500">Threshold: {{ batch.low_stock_threshold }}</div>
+														<div class="text-xs text-gray-500">
+															Threshold: {{ batch.low_stock_threshold }}
+														</div>
 													</td>
 													<td class="px-4 py-2 text-sm text-gray-900">
 														{{ new Date(batch.expiry_date).toLocaleDateString() }}
 													</td>
-													<td class="px-4 py-2 text-sm text-gray-900">{{ batch.distributor || '-' }}</td>
-													<td class="px-4 py-2 text-sm text-gray-900">{{ batch.cost_per_unit ? `₱${batch.cost_per_unit}` : '-' }}</td>
+													<td class="px-4 py-2 text-sm text-gray-900">
+														{{ batch.distributor || "-" }}
+													</td>
+													<td class="px-4 py-2 text-sm text-gray-900">
+														{{
+															batch.date_added
+																? new Date(batch.date_added).toLocaleDateString()
+																: "-"
+														}}
+													</td>
 													<td class="px-4 py-2">
 														<span
 															:class="[
@@ -592,17 +710,25 @@ const getAvailableItems = () => {
 													</td>
 													<td class="px-4 py-2 text-sm font-medium space-x-2">
 														<button
+															v-if="canManageInventory"
 															@click.stop="openEditModal(batch)"
 															class="text-blue-600 hover:text-blue-900"
 														>
 															Edit
 														</button>
-														<button 
-															@click.stop="deleteItem(batch)" 
+														<button
+															v-if="canManageInventory"
+															@click.stop="deleteItem(batch)"
 															class="text-red-600 hover:text-red-900"
 														>
 															Delete
 														</button>
+														<span
+															v-if="!canManageInventory"
+															class="text-gray-400 text-sm"
+														>
+															View only
+														</span>
 													</td>
 												</tr>
 											</tbody>
@@ -666,7 +792,7 @@ const getAvailableItems = () => {
 							<th
 								class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
 							>
-								Cost/Unit
+								Date Added
 							</th>
 							<th
 								class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
@@ -703,7 +829,9 @@ const getAvailableItems = () => {
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap">
 								<div class="text-sm text-gray-900">
-									<span v-if="item.medicine?.dosage_strength">{{ item.medicine.dosage_strength }}</span>
+									<span v-if="item.medicine?.dosage_strength">{{
+										item.medicine.dosage_strength
+									}}</span>
 									<span v-else class="text-gray-400">No dosage</span>
 								</div>
 								<div class="text-xs text-gray-500">
@@ -749,18 +877,31 @@ const getAvailableItems = () => {
 								{{ item.distributor || "-" }}
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-								{{ item.cost_per_unit ? `₱${item.cost_per_unit}` : "-" }}
+								{{
+									item.date_added ? new Date(item.date_added).toLocaleDateString() : "-"
+								}}
 							</td>
 							<td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
 								<button
+									v-if="canManageInventory"
 									@click="openEditModal(item)"
 									class="text-blue-600 hover:text-blue-900"
 								>
 									Edit
 								</button>
-								<button @click="deleteItem(item)" class="text-red-600 hover:text-red-900">
+								<button 
+									v-if="canManageInventory"
+									@click="deleteItem(item)" 
+									class="text-red-600 hover:text-red-900"
+								>
 									Delete
 								</button>
+								<span
+									v-if="!canManageInventory"
+									class="text-gray-400 text-sm"
+								>
+									View only
+								</span>
 							</td>
 						</tr>
 					</tbody>
@@ -797,7 +938,7 @@ const getAvailableItems = () => {
 							Clear filters
 						</button>
 						<button
-							v-else
+							v-else-if="canManageInventory"
 							@click="openAddModal"
 							class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-primary/90"
 						>
@@ -996,26 +1137,34 @@ const getAvailableItems = () => {
 								}}
 								based on current filter
 							</p>
-							
+
 							<!-- Add New Medicine Button -->
-							<div v-if="!showEditModal && currentFilters.type !== 'supplies'" class="mt-2">
-								<button 
+							<div
+								v-if="!showEditModal && currentFilters.type !== 'supplies'"
+								class="mt-2"
+							>
+								<button
 									type="button"
 									@click="toggleNewMedicineForm"
 									class="text-sm text-blue-600 hover:text-blue-800 underline"
 								>
-									{{ showNewMedicineForm ? 'Cancel' : '+ Create New Medicine' }}
+									{{ showNewMedicineForm ? "Cancel" : "+ Create New Medicine" }}
 								</button>
 							</div>
 						</div>
 
 						<!-- New Medicine Form -->
-						<div v-if="showNewMedicineForm && !showEditModal" class="border border-blue-200 rounded-lg p-4 bg-blue-50">
+						<div
+							v-if="showNewMedicineForm && !showEditModal"
+							class="border border-blue-200 rounded-lg p-4 bg-blue-50"
+						>
 							<h4 class="text-sm font-medium text-gray-900 mb-3">Create New Medicine</h4>
-							
+
 							<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
 								<div>
-									<label class="block text-sm font-medium text-gray-700">Medicine Name *</label>
+									<label class="block text-sm font-medium text-gray-700"
+										>Medicine Name *</label
+									>
 									<input
 										v-model="newMedicineForm.name"
 										type="text"
@@ -1044,10 +1193,12 @@ const getAvailableItems = () => {
 									</select>
 								</div>
 							</div>
-							
+
 							<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
 								<div>
-									<label class="block text-sm font-medium text-gray-700">Dosage Strength</label>
+									<label class="block text-sm font-medium text-gray-700"
+										>Dosage Strength</label
+									>
 									<input
 										v-model="newMedicineForm.dosage_strength"
 										type="text"
@@ -1092,7 +1243,7 @@ const getAvailableItems = () => {
 									</select>
 								</div>
 							</div>
-							
+
 							<div class="mb-4">
 								<label class="block text-sm font-medium text-gray-700">Description</label>
 								<textarea
@@ -1102,7 +1253,7 @@ const getAvailableItems = () => {
 									placeholder="Brief description of the medicine"
 								></textarea>
 							</div>
-							
+
 							<button
 								type="button"
 								@click="createNewMedicine"
@@ -1166,19 +1317,6 @@ const getAvailableItems = () => {
 									class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
 								/>
 							</div>
-						</div>
-
-						<div>
-							<label class="block text-sm font-medium text-gray-700"
-								>Cost per Unit (₱)</label
-							>
-							<input
-								v-model="form.cost_per_unit"
-								type="number"
-								step="0.01"
-								min="0"
-								class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-							/>
 						</div>
 
 						<div class="flex justify-end space-x-4 mt-6">

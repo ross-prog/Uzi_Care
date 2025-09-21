@@ -22,7 +22,7 @@ class InventorySeeder extends Seeder
                     'expiry_date' => Carbon::now()->addMonths(rand(6, 24)),
                     'batch_number' => 'BATCH' . rand(1000, 9999),
                     'distributor' => 'Main Campus', // Main campus as primary distributor
-                    'cost_per_unit' => rand(5, 50) / 10,
+                    'date_added' => Carbon::now()->subDays(rand(1, 30)),
                     'low_stock_threshold' => 20,
                     'campus' => 'Main Campus', // Add campus field
                 ],
@@ -32,7 +32,7 @@ class InventorySeeder extends Seeder
                     'expiry_date' => Carbon::now()->addDays(rand(15, 45)), // Some nearing expiry
                     'batch_number' => 'BATCH' . rand(1000, 9999),
                     'distributor' => 'Main Campus', // Received from main campus
-                    'cost_per_unit' => rand(5, 50) / 10,
+                    'date_added' => Carbon::now()->subDays(rand(1, 15)),
                     'low_stock_threshold' => 20,
                     'campus' => 'North Campus', // Add campus field
                 ],

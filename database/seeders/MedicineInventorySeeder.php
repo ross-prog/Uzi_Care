@@ -18,13 +18,9 @@ class MedicineInventorySeeder extends Seeder
         // Define campuses
         $campuses = [
             'Main Campus',
-            'North Campus',
-            'South Campus',
-            'East Campus',
-            'West Campus',
-            'Downtown Campus',
-            'Satellite Clinic A',
-            'Satellite Clinic B'
+            'THS',
+            'SHS',
+            'Laboratory'
         ];
 
         // Define common medicines
@@ -171,10 +167,6 @@ class MedicineInventorySeeder extends Seeder
                     // Generate realistic expiry dates (6 months to 3 years from now)
                     $expiryDate = Carbon::now()->addMonths(rand(6, 36));
                     
-                    // Vary costs slightly
-                    $baseCost = $this->getBaseCost($medicineData['type']);
-                    $costPerUnit = $baseCost + (rand(-50, 100) / 100);
-                    
                     Inventory::create([
                         'medicine_id' => $medicine->id,
                         'campus' => $campus,
@@ -182,7 +174,7 @@ class MedicineInventorySeeder extends Seeder
                         'expiry_date' => $expiryDate,
                         'batch_number' => $batchNumber,
                         'distributor' => $this->getLogicalDistributor($campus),
-                        'cost_per_unit' => $costPerUnit,
+                        'date_added' => Carbon::now()->subDays(rand(1, 60)),
                         'low_stock_threshold' => $this->getLowStockThreshold($medicineData['type']),
                     ]);
                 }
@@ -215,28 +207,6 @@ class MedicineInventorySeeder extends Seeder
         $typeMultiplier = $typeMultipliers[$medicineType] ?? 1.0;
         
         return (int)($baseQuantity * $campusMultiplier * $typeMultiplier);
-    }
-
-    private function getBaseCost($medicineType)
-    {
-        $baseCosts = [
-            'Analgesic' => 0.50,
-            'NSAID' => 0.75,
-            'Antihistamine' => 1.20,
-            'Antibiotic' => 2.50,
-            'PPI' => 1.80,
-            'Bronchodilator' => 15.00,
-            'Antidiabetic' => 1.50,
-            'Antihypertensive' => 1.25,
-            'Statin' => 2.00,
-            'Antiplatelet' => 0.30,
-            'Antitussive' => 8.50,
-            'Antidiarrheal' => 1.00,
-            'H2 Blocker' => 1.30,
-            'Supplement' => 0.80,
-        ];
-
-        return $baseCosts[$medicineType] ?? 1.00;
     }
 
     private function getLowStockThreshold($medicineType)

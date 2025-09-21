@@ -224,11 +224,12 @@ class MedicinesWithDosageSeeder extends Seeder
             if (!$existingInventory) {
                 Inventory::create([
                     'medicine_id' => $medicine->id,
+                    'campus' => 'Main Campus',
                     'quantity' => $stock,
                     'expiry_date' => now()->addYears(2),
                     'batch_number' => 'BATCH-' . strtoupper(substr($medicine->name, 0, 3)) . '-' . date('Y'),
-                    'supplier' => 'General Medical Supply Co.',
-                    'cost_per_unit' => rand(5, 50) / 10,
+                    'distributor' => 'Main Campus',
+                    'date_added' => now()->subDays(rand(1, 30)),
                     'low_stock_threshold' => 10,
                 ]);
             }

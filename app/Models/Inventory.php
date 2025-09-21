@@ -16,13 +16,13 @@ class Inventory extends Model
         'expiry_date',
         'batch_number',
         'distributor',
-        'cost_per_unit',
+        'date_added',
         'low_stock_threshold',
     ];
 
     protected $casts = [
         'expiry_date' => 'date',
-        'cost_per_unit' => 'decimal:2',
+        'date_added' => 'datetime',
     ];
 
     public function medicine()

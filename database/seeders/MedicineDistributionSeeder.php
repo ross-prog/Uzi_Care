@@ -83,7 +83,7 @@ class MedicineDistributionSeeder extends Seeder
                     'expiry_date' => $inventory->expiry_date,
                     'batch_number' => $inventory->batch_number,
                     'distributor' => 'Main Campus', // Source campus as distributor
-                    'cost_per_unit' => $inventory->cost_per_unit,
+                    'date_added' => $distribution->distribution_date,
                     'low_stock_threshold' => $inventory->low_stock_threshold,
                     'created_at' => $distribution->distribution_date,
                     'updated_at' => $distribution->distribution_date,
@@ -154,7 +154,7 @@ class MedicineDistributionSeeder extends Seeder
                     'expiry_date' => $sourceInventory->expiry_date,
                     'batch_number' => $sourceInventory->batch_number,
                     'distributor' => $fromCampus,
-                    'cost_per_unit' => $sourceInventory->cost_per_unit,
+                    'date_added' => $distribution->distribution_date,
                     'low_stock_threshold' => $sourceInventory->low_stock_threshold,
                     'created_at' => $distribution->distribution_date,
                     'updated_at' => $distribution->distribution_date,

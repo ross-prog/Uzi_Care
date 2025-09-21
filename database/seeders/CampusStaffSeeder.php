@@ -16,64 +16,44 @@ class CampusStaffSeeder extends Seeder
     {
         $campuses = [
             'Main Campus',
-            'North Campus',
-            'South Campus',
-            'East Campus',
-            'West Campus',
-            'Downtown Campus',
-            'Satellite Clinic A',
-            'Satellite Clinic B'
+            'THS',
+            'SHS', 
+            'Laboratory'
         ];
 
         foreach ($campuses as $index => $campus) {
             $campusCode = $this->getCampusCode($campus);
             
-            // Create Inventory Manager for each campus
-            User::updateOrCreate(
-                ['email' => strtolower($campusCode) . '.inventory@uzicare.com'],
-                [
-                    'name' => $campus . ' Inventory Manager',
-                    'employee_id' => $campusCode . '-INV-001',
-                    'role' => 'inventory_manager',
-                    'department' => 'Supply Management',
-                    'campus' => $campus,
-                    'contact_number' => '+1-555-' . sprintf('%04d', 200 + $index),
-                    'password' => Hash::make('Inventory123!'),
-                    'is_active' => true,
-                    'created_by' => 'system',
-                    'email_verified_at' => now(),
-                ]
-            );
-
-            // Create Head Nurse for each campus
-            User::updateOrCreate(
-                ['email' => strtolower($campusCode) . '.nurse@uzicare.com'],
-                [
-                    'name' => $campus . ' Head Nurse',
-                    'employee_id' => $campusCode . '-NUR-001',
-                    'role' => 'nurse',
-                    'department' => 'Medical',
-                    'campus' => $campus,
-                    'contact_number' => '+1-555-' . sprintf('%04d', 300 + $index),
-                    'password' => Hash::make('Nurse123!'),
-                    'is_active' => true,
-                    'created_by' => 'system',
-                    'email_verified_at' => now(),
-                ]
-            );
-
-            // Create Account Manager for main campuses only
-            if (in_array($campus, ['Main Campus', 'North Campus', 'South Campus'])) {
+            // Main Campus gets admin role, others get nurse role
+            if ($campus === 'Main Campus') {
+                // Create Main Campus Administrator
                 User::updateOrCreate(
-                    ['email' => strtolower($campusCode) . '.accounts@uzicare.com'],
+                    ['email' => 'admin.main@uzicare.com'],
                     [
-                        'name' => $campus . ' Account Manager',
-                        'employee_id' => $campusCode . '-ACC-001',
-                        'role' => 'account_manager',
+                        'name' => 'Main Campus Administrator',
+                        'employee_id' => 'MAIN-ADM-001',
+                        'role' => 'admin',
                         'department' => 'Administration',
                         'campus' => $campus,
-                        'contact_number' => '+1-555-' . sprintf('%04d', 400 + $index),
-                        'password' => Hash::make('Accounts123!'),
+                        'contact_number' => '+1-555-1000',
+                        'password' => Hash::make('Admin123!'),
+                        'is_active' => true,
+                        'created_by' => 'system',
+                        'email_verified_at' => now(),
+                    ]
+                );
+            } else {
+                // Create Nurse for other campuses
+                User::updateOrCreate(
+                    ['email' => strtolower($campusCode) . '.nurse@uzicare.com'],
+                    [
+                        'name' => $campus . ' Head Nurse',
+                        'employee_id' => $campusCode . '-NUR-001',
+                        'role' => 'nurse',
+                        'department' => 'Medical',
+                        'campus' => $campus,
+                        'contact_number' => '+1-555-' . sprintf('%04d', 300 + $index),
+                        'password' => Hash::make('Nurse123!'),
                         'is_active' => true,
                         'created_by' => 'system',
                         'email_verified_at' => now(),
@@ -90,17 +70,15 @@ class CampusStaffSeeder extends Seeder
         foreach ($campuses as $campus) {
             $campusCode = $this->getCampusCode($campus);
             $this->command->info('🏥 ' . $campus . ':');
-            $this->command->info('   📦 Inventory Manager:');
-            $this->command->info('      Email: ' . strtolower($campusCode) . '.inventory@uzicare.com');
-            $this->command->info('      Password: Inventory123!');
-            $this->command->info('   👩‍⚕️ Head Nurse:');
-            $this->command->info('      Email: ' . strtolower($campusCode) . '.nurse@uzicare.com');
-            $this->command->info('      Password: Nurse123!');
             
-            if (in_array($campus, ['Main Campus', 'North Campus', 'South Campus'])) {
-                $this->command->info('   👔 Account Manager:');
-                $this->command->info('      Email: ' . strtolower($campusCode) . '.accounts@uzicare.com');
-                $this->command->info('      Password: Accounts123!');
+            if ($campus === 'Main Campus') {
+                $this->command->info('   👑 Administrator:');
+                $this->command->info('      Email: admin.main@uzicare.com');
+                $this->command->info('      Password: Admin123!');
+            } else {
+                $this->command->info('   👩‍⚕️ Head Nurse:');
+                $this->command->info('      Email: ' . strtolower($campusCode) . '.nurse@uzicare.com');
+                $this->command->info('      Password: Nurse123!');
             }
             $this->command->info('');
         }
@@ -111,14 +89,10 @@ class CampusStaffSeeder extends Seeder
     private function getCampusCode($campus)
     {
         $codes = [
-            'Main Campus' => 'MC',
-            'North Campus' => 'NC',
-            'South Campus' => 'SC',
-            'East Campus' => 'EC',
-            'West Campus' => 'WC',
-            'Downtown Campus' => 'DC',
-            'Satellite Clinic A' => 'CA',
-            'Satellite Clinic B' => 'CB'
+            'Main Campus' => 'MAIN',
+            'THS' => 'THS',
+            'SHS' => 'SHS',
+            'Laboratory' => 'LAB'
         ];
 
         return $codes[$campus] ?? 'XX';

@@ -6,6 +6,7 @@ use App\Models\Inventory;
 use App\Models\Medicine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class InventoryController extends Controller
@@ -60,7 +61,7 @@ class InventoryController extends Controller
                     return $batch->expiry_date <= now()->addDays(30);
                 })->count();
                 $earliestExpiry = $batches->min('expiry_date');
-                $averageCost = $batches->where('cost_per_unit', '>', 0)->avg('cost_per_unit');
+                $latestAdded = $batches->max('date_added');
 
                 return [
                     'medicine_id' => $medicineId,
@@ -70,7 +71,7 @@ class InventoryController extends Controller
                     'low_stock_batches' => $lowStockBatches,
                     'expiring_batches' => $expiringBatches,
                     'earliest_expiry' => $earliestExpiry,
-                    'average_cost' => $averageCost,
+                    'latest_added' => $latestAdded,
                     'batches' => $batches->values(),
                 ];
             })->values();
@@ -133,8 +134,182 @@ class InventoryController extends Controller
                 'search' => $search,
                 'per_page' => $perPage,
                 'view' => $view,
-            ]
+            ],
+            'canGenerateReport' => Auth::user()->canGenerateInventoryReports(),
+            'canCompileReports' => Auth::user()->canCompileReports(),
+            'canManageInventory' => Auth::user()->isAdmin(),
         ]);
+    }
+
+    /**
+     * Generate inventory report for current campus
+     */
+    public function generateReport()
+    {
+        $user = Auth::user();
+        
+        if (!$user->canGenerateInventoryReports()) {
+            abort(403, 'Unauthorized to generate inventory reports');
+        }
+
+        $currentMonth = now()->month;
+        $currentYear = now()->year;
+
+        // Check if report already exists for this month
+        $existingReport = \App\Models\MonthlyInventoryReport::where('campus', $user->campus)
+            ->where('report_month', $currentMonth)
+            ->where('report_year', $currentYear)
+            ->first();
+
+        // Get current inventory data for user's campus (including both medicines and supplies)
+        $inventoryData = Inventory::where('campus', $user->campus)
+            ->with('medicine')
+            ->get()
+            ->groupBy('medicine.name')
+            ->map(function ($batches, $medicineName) {
+                $totalQuantity = $batches->sum('quantity');
+                $lowestThreshold = $batches->min('low_stock_threshold');
+                $earliestExpiry = $batches->min('expiry_date');
+                $batchCount = $batches->count();
+                $medicineType = $batches->first()->medicine->type;
+                
+                // Determine if this is a supply or medicine
+                $isSupply = in_array($medicineType, ['Equipment', 'Supply', 'Medical Supply']);
+                
+                return [
+                    'medicine_name' => $medicineName,
+                    'medicine_type' => $medicineType,
+                    'is_supply' => $isSupply,
+                    'total_quantity' => $totalQuantity,
+                    'batch_count' => $batchCount,
+                    'low_stock_threshold' => $lowestThreshold,
+                    'is_low_stock' => $totalQuantity <= $lowestThreshold,
+                    'earliest_expiry' => $earliestExpiry,
+                    'is_expiring_soon' => \Carbon\Carbon::parse($earliestExpiry)->lte(now()->addDays(30)),
+                    'batches' => $batches->map(function ($batch) {
+                        return [
+                            'batch_number' => $batch->batch_number,
+                            'quantity' => $batch->quantity,
+                            'expiry_date' => $batch->expiry_date,
+                            'distributor' => $batch->distributor,
+                            'date_added' => $batch->date_added,
+                        ];
+                    })->toArray(),
+                ];
+            })
+            ->values()
+            ->toArray();
+
+        return Inertia::render('Inventory/GenerateReport', [
+            'inventoryData' => $inventoryData,
+            'campus' => $user->campus,
+            'reportDate' => now()->format('Y-m-d'),
+            'existingReport' => $existingReport,
+            'reportMonth' => now()->format('F Y'),
+        ]);
+    }
+
+    public function saveReport(Request $request)
+    {
+        $user = Auth::user();
+        
+        if (!$user->canGenerateInventoryReports()) {
+            abort(403, 'Unauthorized to save inventory reports');
+        }
+
+        // Log the incoming request data
+        Log::info('saveReport called with data:', [
+            'user_id' => $user->id,
+            'campus' => $user->campus,
+            'has_inventory_data' => $request->has('inventory_data'),
+            'has_order_requests' => $request->has('order_requests'),
+            'inventory_data_count' => $request->has('inventory_data') ? count($request->get('inventory_data', [])) : 0,
+            'order_requests_count' => $request->has('order_requests') ? count($request->get('order_requests', [])) : 0,
+            'raw_request' => $request->all(),
+        ]);
+
+        try {
+            $request->validate([
+                'inventory_data' => 'required|array',
+                'order_requests' => 'nullable|array',
+                'order_requests.*.medicine_name' => 'sometimes|required|string',
+                'order_requests.*.quantity_to_order' => 'sometimes|required|integer|min:0',
+            ], [
+                'inventory_data.required' => 'Inventory data is required',
+                'inventory_data.array' => 'Inventory data must be an array',
+                'order_requests.array' => 'Order requests must be an array',
+                'order_requests.*.medicine_name.required' => 'Medicine name is required for order requests',
+                'order_requests.*.quantity_to_order.required' => 'Quantity to order is required',
+                'order_requests.*.quantity_to_order.integer' => 'Quantity to order must be an integer',
+                'order_requests.*.quantity_to_order.min' => 'Quantity to order cannot be negative',
+            ]);
+            
+            Log::info('Validation passed successfully');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::error('Validation failed:', [
+                'errors' => $e->errors(),
+                'request_data' => $request->all(),
+            ]);
+            throw $e;
+        }
+
+        // Convert order requests to quantity_to_order format (key-value mapping)
+        $quantityToOrder = [];
+        foreach ($request->order_requests ?? [] as $order) {
+            $quantityToOrder[$order['medicine_name']] = $order['quantity_to_order'] ?? 0;
+        }
+
+        Log::info('All order requests (including zeros):', [
+            'total_count' => count($request->get('order_requests', [])),
+            'quantity_to_order' => $quantityToOrder,
+        ]);
+
+        $currentMonth = now()->month;
+        $currentYear = now()->year;
+
+        // Check if report already exists for this campus and month
+        $existingReport = \App\Models\MonthlyInventoryReport::where('campus', $user->campus)
+            ->where('report_month', $currentMonth)
+            ->where('report_year', $currentYear)
+            ->first();
+
+        if ($existingReport) {
+            // Update existing report instead of creating new one
+            $existingReport->update([
+                'inventory_data' => $request->inventory_data,
+                'quantity_to_order' => $quantityToOrder,
+                'status' => $request->get('status', 'draft'),
+                'generated_by' => $user->id,
+                'updated_at' => now(),
+            ]);
+
+            Log::info('Updated existing report:', [
+                'report_id' => $existingReport->id,
+                'status' => $existingReport->status,
+            ]);
+
+            return redirect()->route('monthly-reports.show', $existingReport)
+                ->with('success', 'Inventory report updated successfully');
+        }
+
+        // Create new report if none exists
+        $report = \App\Models\MonthlyInventoryReport::create([
+            'campus' => $user->campus,
+            'report_month' => $currentMonth,
+            'report_year' => $currentYear,
+            'generated_by' => $user->id,
+            'inventory_data' => $request->inventory_data,
+            'quantity_to_order' => $quantityToOrder,
+            'status' => $request->get('status', 'draft'),
+        ]);
+
+        Log::info('Created new report:', [
+            'report_id' => $report->id,
+            'status' => $report->status,
+        ]);
+
+        return redirect()->route('monthly-reports.show', $report)
+            ->with('success', 'Inventory report saved successfully');
     }
 
     public function store(Request $request)
@@ -145,11 +320,14 @@ class InventoryController extends Controller
             'expiry_date' => 'required|date',
             'batch_number' => 'nullable|string',
             'distributor' => 'nullable|string',
-            'cost_per_unit' => 'nullable|numeric|min:0',
             'low_stock_threshold' => 'required|integer|min:0',
         ]);
 
-        $inventory = Inventory::create($request->all());
+        $data = $request->all();
+        $data['campus'] = Auth::user()->campus;
+        $data['date_added'] = now();
+        
+        $inventory = Inventory::create($data);
 
         return response()->json([
             'message' => 'Inventory item added successfully',
@@ -164,7 +342,6 @@ class InventoryController extends Controller
             'expiry_date' => 'required|date',
             'batch_number' => 'nullable|string',
             'distributor' => 'nullable|string',
-            'cost_per_unit' => 'nullable|numeric|min:0',
             'low_stock_threshold' => 'required|integer|min:0',
         ]);
 
