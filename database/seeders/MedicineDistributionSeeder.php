@@ -18,41 +18,37 @@ class MedicineDistributionSeeder extends Seeder
     {
         $campuses = [
             'Main Campus',
-            'North Campus',
-            'South Campus',
-            'East Campus',
-            'West Campus',
-            'Downtown Campus',
-            'Satellite Clinic A',
-            'Satellite Clinic B'
+            'THS',
+            'SHS',
+            'Laboratory'
         ];
 
-        // Get inventory managers for each campus to act as distributors
-        $inventoryManagers = User::where('role', 'inventory_manager')->get()->keyBy('campus');
+        // Get administrators and head nurses for each campus
+        $campusManagers = User::whereIn('role', ['admin', 'head_nurse'])->get()->keyBy('campus');
 
-        // Main Campus acts as the primary distributor to other campuses
-        $mainCampusManager = $inventoryManagers->get('Main Campus');
+        // Main Campus acts as the primary distributor
+        $mainCampusManager = $campusManagers->get('Main Campus');
         
         if (!$mainCampusManager) {
-            $this->command->warn('No inventory manager found for Main Campus. Skipping distribution seeding.');
+            $this->command->warn('No administrator found for Main Campus. Skipping distribution seeding.');
             return;
         }
 
         // Create distributions from Main Campus to other campuses
         foreach ($campuses as $toCampus) {
-            if ($toCampus === 'Main Campus') continue; // Skip self-distribution
+            if ($toCampus === 'Main Campus') continue;
             
-            // Get some inventory items from Main Campus to distribute
+            // Get limited inventory items from Main Campus
             $mainCampusInventories = Inventory::where('campus', 'Main Campus')
-                ->where('quantity', '>', 50) // Only distribute from items with good stock
+                ->where('quantity', '>', 30)
                 ->inRandomOrder()
-                ->limit(rand(15, 25)) // Distribute 15-25 different items per campus
+                ->limit(rand(8, 12)) // Distribute 8-12 items per campus
                 ->get();
 
             foreach ($mainCampusInventories as $inventory) {
-                // Calculate distribution quantity (10-30% of available stock)
-                $maxDistribution = (int)($inventory->quantity * 0.3);
-                $distributionQuantity = rand(10, max(10, $maxDistribution));
+                // Calculate distribution quantity (15-25% of available stock)
+                $maxDistribution = (int)($inventory->quantity * 0.25);
+                $distributionQuantity = rand(5, max(5, $maxDistribution));
                 
                 // Create the distribution record
                 $distribution = MedicineDistribution::create([
@@ -65,12 +61,12 @@ class MedicineDistributionSeeder extends Seeder
                     'quantity_distributed' => $distributionQuantity,
                     'batch_number' => $inventory->batch_number,
                     'expiry_date' => $inventory->expiry_date,
-                    'status' => 'completed', // All seeded distributions are completed
-                    'distribution_date' => Carbon::now()->subDays(rand(1, 30)),
+                    'status' => 'completed',
+                    'distribution_date' => Carbon::now()->subDays(rand(1, 20)),
                     'notes' => $this->getDistributionNotes(),
                 ]);
 
-                // Update source inventory (decrease quantity)
+                // Update source inventory
                 $inventory->update([
                     'quantity' => $inventory->quantity - $distributionQuantity
                 ]);
@@ -82,38 +78,36 @@ class MedicineDistributionSeeder extends Seeder
                     'quantity' => $distributionQuantity,
                     'expiry_date' => $inventory->expiry_date,
                     'batch_number' => $inventory->batch_number,
-                    'distributor' => 'Main Campus', // Source campus as distributor
+                    'distributor' => 'Main Campus',
                     'date_added' => $distribution->distribution_date,
                     'low_stock_threshold' => $inventory->low_stock_threshold,
-                    'created_at' => $distribution->distribution_date,
-                    'updated_at' => $distribution->distribution_date,
                 ]);
             }
         }
 
-        // Create some inter-campus distributions (between non-main campuses)
-        $nonMainCampuses = array_filter($campuses, fn($c) => $c !== 'Main Campus');
+        // Create a few inter-campus distributions
+        $nonMainCampuses = ['THS', 'SHS', 'Laboratory'];
         
-        for ($i = 0; $i < 20; $i++) { // Create 20 inter-campus distributions
+        for ($i = 0; $i < 6; $i++) { // Create only 6 inter-campus distributions
             $fromCampus = $nonMainCampuses[array_rand($nonMainCampuses)];
             $toCampus = $nonMainCampuses[array_rand($nonMainCampuses)];
             
             if ($fromCampus === $toCampus) continue;
             
-            $fromManager = $inventoryManagers->get($fromCampus);
+            $fromManager = $campusManagers->get($fromCampus);
             if (!$fromManager) continue;
             
             // Get inventory from the source campus
             $sourceInventory = Inventory::where('campus', $fromCampus)
-                ->where('quantity', '>', 20)
+                ->where('quantity', '>', 15)
                 ->inRandomOrder()
                 ->first();
                 
             if (!$sourceInventory) continue;
             
-            $distributionQuantity = rand(5, min(15, (int)($sourceInventory->quantity * 0.4)));
+            $distributionQuantity = rand(3, min(10, (int)($sourceInventory->quantity * 0.3)));
             
-            $distribution = MedicineDistribution::create([
+            MedicineDistribution::create([
                 'medicine_id' => $sourceInventory->medicine_id,
                 'inventory_id' => $sourceInventory->id,
                 'distributed_by' => $fromManager->id,
@@ -124,7 +118,7 @@ class MedicineDistributionSeeder extends Seeder
                 'batch_number' => $sourceInventory->batch_number,
                 'expiry_date' => $sourceInventory->expiry_date,
                 'status' => 'completed',
-                'distribution_date' => Carbon::now()->subDays(rand(1, 15)),
+                'distribution_date' => Carbon::now()->subDays(rand(1, 10)),
                 'notes' => 'Inter-campus transfer',
             ]);
 
@@ -132,38 +126,10 @@ class MedicineDistributionSeeder extends Seeder
             $sourceInventory->update([
                 'quantity' => $sourceInventory->quantity - $distributionQuantity
             ]);
-
-            // Create or update inventory entry for receiving campus
-            $existingInventory = Inventory::where([
-                'medicine_id' => $sourceInventory->medicine_id,
-                'campus' => $toCampus,
-                'batch_number' => $sourceInventory->batch_number,
-            ])->first();
-
-            if ($existingInventory) {
-                // Add to existing inventory
-                $existingInventory->update([
-                    'quantity' => $existingInventory->quantity + $distributionQuantity
-                ]);
-            } else {
-                // Create new inventory entry
-                Inventory::create([
-                    'medicine_id' => $sourceInventory->medicine_id,
-                    'campus' => $toCampus,
-                    'quantity' => $distributionQuantity,
-                    'expiry_date' => $sourceInventory->expiry_date,
-                    'batch_number' => $sourceInventory->batch_number,
-                    'distributor' => $fromCampus,
-                    'date_added' => $distribution->distribution_date,
-                    'low_stock_threshold' => $sourceInventory->low_stock_threshold,
-                    'created_at' => $distribution->distribution_date,
-                    'updated_at' => $distribution->distribution_date,
-                ]);
-            }
         }
 
         $distributionCount = MedicineDistribution::count();
-        $this->command->info("Created {$distributionCount} medicine distributions with corresponding inventory adjustments.");
+        $this->command->info("Created {$distributionCount} medicine distributions.");
     }
 
     private function getRandomDepartment()
@@ -171,13 +137,8 @@ class MedicineDistributionSeeder extends Seeder
         $departments = [
             'Emergency Department',
             'Internal Medicine',
-            'Pediatrics',
-            'Surgery',
             'Pharmacy',
             'Outpatient Clinic',
-            'ICU',
-            'Cardiology',
-            'Orthopedics',
             'General Practice'
         ];
 
@@ -188,15 +149,10 @@ class MedicineDistributionSeeder extends Seeder
     {
         $notes = [
             'Regular restocking',
-            'Emergency supply request',
+            'Emergency supply',
             'Monthly distribution',
             'Low stock replenishment',
-            'Planned distribution',
-            'Urgent medical supply',
-            'Seasonal restocking',
-            'Department request',
-            'Inventory balancing',
-            'Standard supply chain'
+            'Standard supply'
         ];
 
         return $notes[array_rand($notes)];

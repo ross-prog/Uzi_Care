@@ -102,11 +102,11 @@ class User extends Authenticatable
     }
 
     /**
-     * Check if user can manage accounts (user creation) - ONLY super_admin
+     * Check if user can manage accounts (user creation) - Admin and Super Admin
      */
     public function canManageAccounts(): bool
     {
-        return $this->isSuperAdmin(); // Only super admin can manage users
+        return in_array($this->role, ['admin', 'super_admin']);
     }
 
     /**

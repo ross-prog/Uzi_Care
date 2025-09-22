@@ -92,6 +92,9 @@ class MonthlyInventoryReportController extends Controller
             $inventoryData[] = [
                 'medicine_name' => $medicine->name,
                 'current_stock' => $totalQuantity,
+                'category' => $medicine->category, // Use the new category field
+                'type' => $medicine->type, // Keep type for detailed classification
+                'unit' => $medicine->unit,
             ];
 
             // Initialize quantity to order as 0
@@ -123,8 +126,27 @@ class MonthlyInventoryReportController extends Controller
             abort(403, 'Unauthorized to view this report');
         }
 
+        // Enrich inventory data with current medicine categories
+        $report = $monthlyInventoryReport->load(['generatedBy']);
+        
+        if ($report->inventory_data) {
+            $medicineNames = collect($report->inventory_data)->pluck('medicine_name');
+            $medicines = Medicine::whereIn('name', $medicineNames)->get()->keyBy('name');
+            
+            $enrichedInventoryData = collect($report->inventory_data)->map(function ($item) use ($medicines) {
+                $medicineName = $item['medicine_name'];
+                $medicine = $medicines->get($medicineName);
+                
+                return array_merge($item, [
+                    'category' => $medicine ? $medicine->category : 'Medicine',
+                ]);
+            })->toArray();
+            
+            $report->inventory_data = $enrichedInventoryData;
+        }
+
         return Inertia::render('Reports/MonthlyInventory/Show', [
-            'report' => $monthlyInventoryReport->load(['generatedBy']),
+            'report' => $report,
             'canEdit' => $this->canEditReport($user, $monthlyInventoryReport),
         ]);
     }
@@ -150,6 +172,7 @@ class MonthlyInventoryReportController extends Controller
             'inventory_data.*.medicine_name' => 'required|string',
             'inventory_data.*.current_stock' => 'required|integer|min:0',
             'inventory_data.*.quantity_to_order' => 'required|integer|min:0',
+            'inventory_data.*.category' => 'nullable|string',
         ]);
 
         // Separate current stock data from quantity to order data
@@ -160,6 +183,7 @@ class MonthlyInventoryReportController extends Controller
             $inventoryData[] = [
                 'medicine_name' => $item['medicine_name'],
                 'current_stock' => $item['current_stock'],
+                'category' => $item['category'] ?? 'Medicine',
             ];
             $quantityToOrder[$item['medicine_name']] = $item['quantity_to_order'];
         }
@@ -234,18 +258,32 @@ class MonthlyInventoryReportController extends Controller
             'status' => 'submitted'
         ])->with('generatedBy')->get();
 
-        // Organize data by campus
+        // Organize data by campus and category
         $campusData = [];
         $allMedicines = [];
+        $itemsByCategory = [
+            'Medicines' => [],
+            'Supplies' => []
+        ];
 
         foreach ($reports as $report) {
             $campus = $report->campus;
+            
+            // Get medicine names to enrich with category data
+            $medicineNames = collect($report->inventory_data)->pluck('medicine_name');
+            $medicines = Medicine::whereIn('name', $medicineNames)->get()->keyBy('name');
             
             // Combine inventory_data with quantity_to_order for complete data
             $combinedData = [];
             foreach ($report->inventory_data as $item) {
                 $medicineName = $item['medicine_name'];
                 $quantityToOrder = $report->quantity_to_order[$medicineName] ?? 0;
+                
+                // Get category from database if not present in stored data
+                $medicine = $medicines->get($medicineName);
+                $category = $item['category'] ?? ($medicine ? $medicine->category : 'Medicine');
+                $type = $item['type'] ?? 'Unknown';
+                $unit = $item['unit'] ?? 'units';
                 
                 // Handle different data structures for backward compatibility
                 $currentStock = 0;
@@ -257,11 +295,25 @@ class MonthlyInventoryReportController extends Controller
                     $currentStock = $item['total_quantity'];
                 }
                 
-                $combinedData[] = [
+                $itemData = [
                     'medicine_name' => $medicineName,
                     'current_stock' => $currentStock,
-                    'quantity_to_order' => $quantityToOrder
+                    'quantity_to_order' => $quantityToOrder,
+                    'category' => $category,
+                    'type' => $type,
+                    'unit' => $unit
                 ];
+                
+                $combinedData[] = $itemData;
+                
+                // Categorize items using the enriched category field (handle case and singular/plural)
+                $normalizedCategory = strtolower(trim($category));
+                $isSupply = in_array($normalizedCategory, ['supply', 'supplies']);
+                $categoryGroup = $isSupply ? 'Supplies' : 'Medicines';
+
+                if (!in_array($medicineName, $itemsByCategory[$categoryGroup])) {
+                    $itemsByCategory[$categoryGroup][] = $medicineName;
+                }
             }
             
             $campusData[$campus] = [
@@ -278,12 +330,18 @@ class MonthlyInventoryReportController extends Controller
         }
 
         sort($allMedicines);
+        
+        // Sort categories
+        foreach ($itemsByCategory as &$items) {
+            sort($items);
+        }
 
         return Inertia::render('Reports/MonthlyInventory/Compilation', [
             'month' => $month,
             'year' => $year,
             'campusData' => $campusData,
             'allMedicines' => $allMedicines,
+            'itemsByCategory' => $itemsByCategory,
         ]);
     }
 
@@ -312,36 +370,66 @@ class MonthlyInventoryReportController extends Controller
         // Organize data by campus (same logic as other export methods)
         $campusData = [];
         $allMedicines = [];
+        $itemsByCategory = [
+            'Medicines' => [],
+            'Supplies' => []
+        ];
 
         foreach ($reports as $report) {
             $campus = $report->campus;
-            
+
+            // Build a medicines lookup from DB based on names present in this report
+            $medicineNames = collect($report->inventory_data)->pluck('medicine_name');
+            $medicines = Medicine::whereIn('name', $medicineNames)->get()->keyBy('name');
+
             $combinedData = [];
             foreach ($report->inventory_data as $item) {
                 $medicineName = $item['medicine_name'];
                 $quantityToOrder = $report->quantity_to_order[$medicineName] ?? 0;
-                
+
+                // Support both new and old formats for stock
+                $currentStock = $item['current_stock'] ?? ($item['total_quantity'] ?? 0);
+
                 $combinedData[] = [
                     'medicine_name' => $medicineName,
-                    'current_stock' => $item['total_quantity'], // Fixed: use total_quantity instead of current_stock
+                    'current_stock' => $currentStock,
                     'quantity_to_order' => $quantityToOrder
                 ];
-                
+
                 if (!in_array($medicineName, $allMedicines)) {
                     $allMedicines[] = $medicineName;
                 }
+
+                // Determine category if available, otherwise fallback to Medicine table
+                $category = $item['category'] ?? null;
+                if (!$category) {
+                    $med = $medicines->get($medicineName);
+                    $category = $med ? $med->category : 'Medicine';
+                }
+
+                $normalizedCategory = strtolower(trim($category));
+                $isSupply = in_array($normalizedCategory, ['supply', 'supplies']);
+                $categoryGroup = $isSupply ? 'Supplies' : 'Medicines';
+                if (!in_array($medicineName, $itemsByCategory[$categoryGroup])) {
+                    $itemsByCategory[$categoryGroup][] = $medicineName;
+                }
             }
-            
+
             $campusData[$campus] = ['inventory_data' => $combinedData];
         }
 
         sort($allMedicines);
 
+        // Sort categories
+        foreach ($itemsByCategory as &$items) {
+            sort($items);
+        }
+
         $monthName = date('F', mktime(0, 0, 0, $month, 1));
         $reportPeriod = "$monthName $year";
 
-        // Use the Excel export class with merged headers
-        $export = new MonthlyInventoryCompilationExport($campusData, $allMedicines, $reportPeriod);
+        // Use the Excel export class with merged headers (pass itemsByCategory)
+        $export = new MonthlyInventoryCompilationExport($campusData, $allMedicines, $itemsByCategory, $reportPeriod);
         
         $filename = "Monthly_Inventory_Compilation_{$monthName}_{$year}.xlsx";
 

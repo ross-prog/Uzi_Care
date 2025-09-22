@@ -101,7 +101,6 @@
 										<option value="admin">Administrator</option>
 										<option value="nurse">Nurse</option>
 										<option value="inventory_manager">Inventory Manager</option>
-										<option value="account_manager">Account Manager</option>
 									</select>
 									<div v-if="form.errors.role" class="mt-1 text-sm text-red-600">
 										{{ form.errors.role }}
@@ -177,9 +176,6 @@
 								</div>
 								<div v-else-if="form.role === 'inventory_manager'">
 									<strong>Inventory Manager:</strong> Full inventory management, medicine tracking, stock alerts, and inventory reports.
-								</div>
-								<div v-else-if="form.role === 'account_manager'">
-									<strong>Account Manager:</strong> User account creation, management, and basic system access.
 								</div>
 							</div>
 						</div>

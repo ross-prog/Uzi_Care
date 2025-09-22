@@ -181,7 +181,67 @@ class MedicineInventorySeeder extends Seeder
             }
         }
 
-        $this->command->info('Created ' . count($medicines) . ' medicines with inventory across ' . count($campuses) . ' campuses.');
+        // Also create inventory for existing supply-type medicines
+        $supplyMedicines = Medicine::whereIn('type', ['Equipment', 'Supply', 'Medical Supply'])->get();
+        
+        foreach ($supplyMedicines as $medicine) {
+            // Create inventory for each campus
+            foreach ($campuses as $campus) {
+                // Create 1-2 batches per supply per campus
+                for ($batch = 1; $batch <= rand(1, 2); $batch++) {
+                    $batchNumber = strtoupper(substr($campus, 0, 2)) . date('y') . sprintf('%03d', $medicine->id) . sprintf('%02d', $batch);
+                    
+                    // Supply quantities are typically lower than medicines
+                    $baseQuantity = $this->getSupplyBaseQuantity($campus, $medicine->type);
+                    $quantity = $baseQuantity + rand(-10, 30);
+                    
+                    // Supplies generally have longer shelf life (1-5 years)
+                    $expiryDate = Carbon::now()->addMonths(rand(12, 60));
+                    
+                    Inventory::create([
+                        'medicine_id' => $medicine->id,
+                        'campus' => $campus,
+                        'quantity' => max(0, $quantity), // Ensure non-negative
+                        'expiry_date' => $expiryDate,
+                        'batch_number' => $batchNumber,
+                        'distributor' => $this->getLogicalDistributor($campus),
+                        'date_added' => Carbon::now()->subDays(rand(1, 60)),
+                        'low_stock_threshold' => $this->getSupplyLowStockThreshold($medicine->type),
+                    ]);
+                }
+            }
+        }
+
+        $this->command->info('Created ' . count($medicines) . ' medicines and ' . $supplyMedicines->count() . ' supplies with inventory across ' . count($campuses) . ' campuses.');
+    }
+
+    private function getSupplyBaseQuantity($campus, $supplyType)
+    {
+        // Main campuses have more supply stock
+        $campusMultiplier = in_array($campus, ['Main Campus', 'North Campus', 'South Campus']) ? 1.5 : 1.0;
+        
+        // Different supply types have different base quantities
+        $typeMultipliers = [
+            'Supply' => 1.5,        
+            'Equipment' => 0.8,    
+            'Medical Supply' => 1.2,
+        ];
+
+        $baseQuantity = 80;
+        $typeMultiplier = $typeMultipliers[$supplyType] ?? 1.0;
+        
+        return (int)($baseQuantity * $campusMultiplier * $typeMultiplier);
+    }
+
+    private function getSupplyLowStockThreshold($supplyType)
+    {
+        $thresholds = [
+            'Supply' => 20,         // Bandages, gauze, etc.
+            'Equipment' => 5,       // Equipment items
+            'Medical Supply' => 15, // Medical supplies
+        ];
+
+        return $thresholds[$supplyType] ?? 10;
     }
 
     private function getBaseQuantity($campus, $medicineType)

@@ -10,6 +10,7 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\MedicineDistributionController;
 use App\Http\Controllers\MonthlyInventoryReportController;
+use App\Http\Controllers\NurseNoteController;
 use App\Http\Middleware\RoleMiddleware;
 
 // Authentication Routes
@@ -28,6 +29,27 @@ Route::get('/', function () {
 
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+    
+    // Test route for debugging compilation data
+    Route::get('/test-compilation', function () {
+        $reports = \App\Models\MonthlyInventoryReport::where('status', 'submitted')->get();
+        $data = [];
+        
+        foreach ($reports as $report) {
+            $data[] = [
+                'campus' => $report->campus,
+                'month' => $report->report_month,
+                'year' => $report->report_year,
+                'inventory_count' => count($report->inventory_data ?? []),
+                'sample_items' => array_slice($report->inventory_data ?? [], 0, 3),
+                'supplies' => array_filter($report->inventory_data ?? [], function($item) {
+                    return ($item['category'] ?? '') === 'Supply';
+                })
+            ];
+        }
+        
+        return response()->json($data);
+    })->name('test.compilation');
     Route::get('/user', [AuthController::class, 'user'])->name('user');
 });
 
@@ -47,7 +69,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/inventory/dashboard', [DashboardController::class, 'inventory'])->name('inventory.dashboard');
     });
     
-    // Remove account manager routes (no one can manage accounts)
     
     // EHR Routes - accessible to admin and nurse
     Route::middleware(['strict-role:manage-records'])->prefix('ehr')->name('ehr.')->group(function () {
@@ -62,6 +83,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/{record}/nurse-notes-pdf', [PatientConsultationController::class, 'downloadNurseNotesPdf'])->name('nurse-notes.pdf');
         Route::get('/{record}/audit-logs', [PatientConsultationController::class, 'getAuditLogs'])->name('audit-logs');
         Route::get('/timeline/{studentEmployeeId}', [PatientConsultationController::class, 'getPatientTimeline'])->name('timeline');
+    });
+    
+    // Nurse Notes Routes - accessible to admin and nurse
+    Route::middleware(['auth', 'strict-role:manage-records'])->prefix('nurse-notes')->name('nurse-notes.')->group(function () {
+        Route::get('/{consultationRecord}', [NurseNoteController::class, 'index'])->name('index');
+        Route::post('/', [NurseNoteController::class, 'store'])->name('store');
     });
     
     // (Moved inventory and distribution routes below with new strict middleware)

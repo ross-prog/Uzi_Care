@@ -18,13 +18,15 @@ class MonthlyInventoryCompilationExport implements FromArray, WithHeadings, With
 {
     protected $campusData;
     protected $allMedicines;
+    protected $itemsByCategory;
     protected $reportPeriod;
     protected $campusList;
 
-    public function __construct($campusData, $allMedicines, $reportPeriod)
+    public function __construct($campusData, $allMedicines, $itemsByCategory, $reportPeriod)
     {
         $this->campusData = $campusData;
         $this->allMedicines = $allMedicines;
+        $this->itemsByCategory = $itemsByCategory;
         $this->reportPeriod = $reportPeriod;
         $this->campusList = array_keys($campusData);
     }
@@ -34,6 +36,12 @@ class MonthlyInventoryCompilationExport implements FromArray, WithHeadings, With
      */
     public function headings(): array
     {
+        $headers = [];
+        
+        // Medicine section headers
+        $headers[] = ['MEDICINE INVENTORY COMPILATION - ' . $this->reportPeriod];
+        $headers[] = [''];
+        
         // First row: Campus headers (will be merged)
         $row1 = ['Medicine Name'];
         foreach ($this->campusList as $campus) {
@@ -41,7 +49,8 @@ class MonthlyInventoryCompilationExport implements FromArray, WithHeadings, With
             $row1[] = $formattedCampus;
             $row1[] = ''; // Empty cell for merging
         }
-        $row1[] = 'Total Medicines';
+        $row1[] = 'Total Needed';
+        $headers[] = $row1;
         
         // Second row: Sub-headers
         $row2 = [''];
@@ -49,9 +58,10 @@ class MonthlyInventoryCompilationExport implements FromArray, WithHeadings, With
             $row2[] = 'Current Stock';
             $row2[] = 'Qty to Order';
         }
-        $row2[] = 'Across Campus Needed';
+        $row2[] = 'Across Campus';
+        $headers[] = $row2;
         
-        return [$row1, $row2];
+        return $headers;
     }
 
     /**
@@ -61,17 +71,56 @@ class MonthlyInventoryCompilationExport implements FromArray, WithHeadings, With
     {
         $data = [];
         
-        foreach ($this->allMedicines as $medicine) {
-            $row = [$medicine];
-            
-            foreach ($this->campusList as $campus) {
-                $campusData = $this->getCampusData($campus, $medicine);
-                $row[] = $campusData['current_stock'];
-                $row[] = $campusData['quantity_to_order'];
+        // Add medicines data
+        if (!empty($this->itemsByCategory['Medicines'])) {
+            foreach ($this->itemsByCategory['Medicines'] as $medicine) {
+                $row = [$medicine];
+                
+                foreach ($this->campusList as $campus) {
+                    $campusData = $this->getCampusData($campus, $medicine);
+                    $row[] = $campusData['current_stock'];
+                    $row[] = $campusData['quantity_to_order'];
+                }
+                
+                $row[] = $this->getTotalQuantityNeeded($medicine);
+                $data[] = $row;
             }
-            
-            $row[] = $this->getTotalQuantityNeeded($medicine);
-            $data[] = $row;
+        }
+        
+        // Add empty rows for separation
+        $data[] = [''];
+        $data[] = [''];
+        
+        // Add supplies section header
+        $suppliesHeader = ['SUPPLIES INVENTORY SUMMARY'];
+        for ($i = 1; $i < count($this->campusList) * 2 + 1; $i++) {
+            $suppliesHeader[] = '';
+        }
+        $data[] = $suppliesHeader;
+        $data[] = [''];
+        
+        // Supplies table headers
+        $suppliesRow1 = ['Supply Item'];
+        foreach ($this->campusList as $campus) {
+            $formattedCampus = ucwords(str_replace('_', ' ', $campus));
+            $suppliesRow1[] = $formattedCampus;
+        }
+        $suppliesRow1[] = 'Total Stock';
+        $data[] = $suppliesRow1;
+        
+        // Add supplies data
+        if (!empty($this->itemsByCategory['Supplies'])) {
+            foreach ($this->itemsByCategory['Supplies'] as $supply) {
+                $row = [$supply];
+                
+                foreach ($this->campusList as $campus) {
+                    $campusData = $this->getCampusData($campus, $supply);
+                    $row[] = $campusData['current_stock'];
+                }
+                
+                $row[] = $this->getTotalStock($supply);
+                $data[] = $row;
+            }
         }
         
         return $data;
@@ -116,6 +165,23 @@ class MonthlyInventoryCompilationExport implements FromArray, WithHeadings, With
     }
 
     /**
+     * Calculate total stock across campuses (for supplies)
+     */
+    private function getTotalStock($itemName)
+    {
+        $total = 0;
+        
+        foreach ($this->campusList as $campus) {
+            $data = $this->getCampusData($campus, $itemName);
+            if ($data['current_stock'] !== '-' && is_numeric($data['current_stock'])) {
+                $total += (int)$data['current_stock'];
+            }
+        }
+        
+        return $total;
+    }
+
+    /**
      * Column widths
      */
     public function columnWidths(): array
@@ -139,8 +205,24 @@ class MonthlyInventoryCompilationExport implements FromArray, WithHeadings, With
     public function styles(Worksheet $sheet)
     {
         return [
-            // Header rows styling
-            '1:2' => [
+            // Title row styling
+            '1:1' => [
+                'font' => [
+                    'bold' => true,
+                    'size' => 14,
+                    'color' => ['rgb' => 'FFFFFF']
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '1F2937'] // Dark gray background
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER
+                ]
+            ],
+            // Medicine header rows styling (rows 3-4)
+            '3:4' => [
                 'font' => [
                     'bold' => true,
                     'color' => ['rgb' => 'FFFFFF']
@@ -175,10 +257,13 @@ class MonthlyInventoryCompilationExport implements FromArray, WithHeadings, With
                 $highestRow = $sheet->getHighestRow();
                 $highestColumn = $sheet->getHighestColumn();
                 
-                // Merge medicine name header cell (A1:A2)
-                $sheet->mergeCells('A1:A2');
+                // Merge title row across all columns
+                $sheet->mergeCells('A1:' . $highestColumn . '1');
                 
-                // Merge campus header cells
+                // Merge medicine name header cell (A3:A4)
+                $sheet->mergeCells('A3:A4');
+                
+                // Merge campus header cells for medicines section (row 3)
                 $currentCol = 'B';
                 foreach ($this->campusList as $campus) {
                     $startCol = $currentCol;
@@ -187,24 +272,73 @@ class MonthlyInventoryCompilationExport implements FromArray, WithHeadings, With
                     $currentCol = chr(ord($currentCol) + 1); // Skip to next campus
                     
                     // Merge campus header across two columns
-                    $sheet->mergeCells($startCol . '1:' . $endCol . '1');
+                    $sheet->mergeCells($startCol . '3:' . $endCol . '3');
                 }
                 
-                // Merge total column header (last column)
+                // Merge total column header for medicines (last column)
                 $totalCol = $highestColumn;
-                $sheet->mergeCells($totalCol . '1:' . $totalCol . '2');
+                $sheet->mergeCells($totalCol . '3:' . $totalCol . '4');
+                
+                // Find supplies section and format it
+                $suppliesHeaderRow = 0;
+                for ($row = 1; $row <= $highestRow; $row++) {
+                    $cellValue = $sheet->getCell('A' . $row)->getValue();
+                    if (strpos($cellValue, 'SUPPLIES INVENTORY') !== false) {
+                        $suppliesHeaderRow = $row;
+                        break;
+                    }
+                }
+                
+                if ($suppliesHeaderRow > 0) {
+                    // Style supplies header
+                    $sheet->mergeCells('A' . $suppliesHeaderRow . ':' . $highestColumn . $suppliesHeaderRow);
+                    $sheet->getStyle('A' . $suppliesHeaderRow . ':' . $highestColumn . $suppliesHeaderRow)->applyFromArray([
+                        'font' => [
+                            'bold' => true,
+                            'size' => 12,
+                            'color' => ['rgb' => 'FFFFFF']
+                        ],
+                        'fill' => [
+                            'fillType' => Fill::FILL_SOLID,
+                            'startColor' => ['rgb' => '059669'] // Green background
+                        ],
+                        'alignment' => [
+                            'horizontal' => Alignment::HORIZONTAL_CENTER,
+                            'vertical' => Alignment::VERTICAL_CENTER
+                        ]
+                    ]);
+                    
+                    // Style supplies table headers (row after supplies header)
+                    $suppliesTableHeaderRow = $suppliesHeaderRow + 2;
+                    if ($suppliesTableHeaderRow <= $highestRow) {
+                        $sheet->getStyle('A' . $suppliesTableHeaderRow . ':' . $highestColumn . $suppliesTableHeaderRow)->applyFromArray([
+                            'font' => [
+                                'bold' => true,
+                                'color' => ['rgb' => 'FFFFFF']
+                            ],
+                            'fill' => [
+                                'fillType' => Fill::FILL_SOLID,
+                                'startColor' => ['rgb' => '10B981'] // Light green background
+                            ],
+                            'alignment' => [
+                                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                                'vertical' => Alignment::VERTICAL_CENTER
+                            ]
+                        ]);
+                    }
+                }
                 
                 // Apply borders to all data
                 $dataRange = 'A1:' . $highestColumn . $highestRow;
                 $sheet->getStyle($dataRange)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
                 
-                // Highlight the total column with light blue background
-                $totalRange = $totalCol . '3:' . $totalCol . $highestRow;
+                // Highlight the total columns with light backgrounds
+                $totalRange = $totalCol . '5:' . $totalCol . $highestRow;
                 $sheet->getStyle($totalRange)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E0F2FE');
                 
-                // Center align numeric columns (starting from row 3 due to 2-row header)
+                // Center align numeric columns (starting from row 5 for medicines)
                 for ($col = 'B'; $col <= $highestColumn; $col++) {
-                    $sheet->getStyle($col . '3:' . $col . $highestRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                    $sheet->getStyle($col . '5:' . $col . $highestRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                 }
                 
                 // Auto-size columns

@@ -8,6 +8,7 @@ use App\Models\Medicine;
 use App\Models\Inventory;
 use App\Models\AuditLog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
@@ -16,13 +17,17 @@ class PatientConsultationController extends Controller
 {
     public function index()
     {
+        $userCampus = Auth::user()->campus;
+        
         // Get medicines with inventory quantities - fixed approach
         $medicines = Medicine::whereNotIn('type', ['Medical Supply', 'Medical Device'])
             ->orderBy('name')
             ->get()
-            ->map(function($medicine) {
-                // Calculate total available quantity across all inventory records
-                $totalQuantity = Inventory::where('medicine_id', $medicine->id)->sum('quantity');
+            ->map(function($medicine) use ($userCampus) {
+                // Calculate total available quantity across all inventory records for this campus
+                $totalQuantity = Inventory::where('medicine_id', $medicine->id)
+                    ->where('campus', $userCampus)
+                    ->sum('quantity');
                 $medicine->available_quantity = $totalQuantity ?? 0;
                 return $medicine;
             });
@@ -31,9 +36,11 @@ class PatientConsultationController extends Controller
         $equipment = Medicine::whereIn('type', ['Medical Supply', 'Medical Device'])
             ->orderBy('name')
             ->get()
-            ->map(function($equipmentItem) {
-                // Calculate total available quantity across all inventory records
-                $totalQuantity = Inventory::where('medicine_id', $equipmentItem->id)->sum('quantity');
+            ->map(function($equipmentItem) use ($userCampus) {
+                // Calculate total available quantity across all inventory records for this campus
+                $totalQuantity = Inventory::where('medicine_id', $equipmentItem->id)
+                    ->where('campus', $userCampus)
+                    ->sum('quantity');
                 $equipmentItem->available_quantity = $totalQuantity ?? 0;
                 return $equipmentItem;
             });
@@ -50,7 +57,11 @@ class PatientConsultationController extends Controller
             'student_employee_id' => 'required|string'
         ]);
 
+        $user = Auth::user();
+        $userCampus = $user->campus;
+
         $records = PatientConsultationRecord::where('student_employee_id', $request->student_employee_id)
+            ->where('campus', $userCampus)
             ->with('nurseNotes')
             ->orderBy('consultation_date_time', 'desc')
             ->get();
@@ -129,16 +140,18 @@ class PatientConsultationController extends Controller
         DB::beginTransaction();
         
         try {
+            $userCampus = Auth::user()->campus;
+            
             // Check inventory availability for medicines
             if (!empty($validatedData['medicines'])) {
                 foreach ($validatedData['medicines'] as $medicine) {
                     $medicineName = $medicine['name'];
                     $quantityUsed = isset($medicine['quantity']) ? $medicine['quantity'] : 1;
                     
-                    // Find medicine in inventory
+                    // Find medicine in inventory for this campus
                     $inventoryItem = Inventory::whereHas('medicine', function($query) use ($medicineName) {
                         $query->where('name', $medicineName);
-                    })->first();
+                    })->where('campus', $userCampus)->first();
                     
                     if (!$inventoryItem) {
                         throw new \Exception("Medicine '{$medicineName}' not found in inventory.");
@@ -156,10 +169,10 @@ class PatientConsultationController extends Controller
                     $equipmentName = $equipment['name'];
                     $quantityUsed = isset($equipment['quantity']) ? $equipment['quantity'] : 1;
                     
-                    // Find equipment in inventory
+                    // Find equipment in inventory for this campus
                     $inventoryItem = Inventory::whereHas('medicine', function($query) use ($equipmentName) {
                         $query->where('name', $equipmentName);
-                    })->first();
+                    })->where('campus', $userCampus)->first();
                     
                     if (!$inventoryItem) {
                         throw new \Exception("Equipment '{$equipmentName}' not found in inventory.");
@@ -170,6 +183,9 @@ class PatientConsultationController extends Controller
                     }
                 }
             }
+            
+            // Add campus from current user
+            $validatedData['campus'] = Auth::user()->campus;
             
             // Create the patient consultation record
             $record = PatientConsultationRecord::create($validatedData);
@@ -182,7 +198,7 @@ class PatientConsultationController extends Controller
                     
                     $inventoryItem = Inventory::whereHas('medicine', function($query) use ($medicineName) {
                         $query->where('name', $medicineName);
-                    })->first();
+                    })->where('campus', $userCampus)->first();
                     
                     $inventoryItem->decrement('quantity', $quantityUsed);
                 }
@@ -196,7 +212,7 @@ class PatientConsultationController extends Controller
                     
                     $inventoryItem = Inventory::whereHas('medicine', function($query) use ($equipmentName) {
                         $query->where('name', $equipmentName);
-                    })->first();
+                    })->where('campus', $userCampus)->first();
                     
                     $inventoryItem->decrement('quantity', $quantityUsed);
                 }
@@ -223,6 +239,13 @@ class PatientConsultationController extends Controller
 
     public function update(Request $request, PatientConsultationRecord $record)
     {
+        $userCampus = Auth::user()->campus;
+        
+        // Check if the record belongs to the user's campus
+        if ($record->campus !== $userCampus) {
+            abort(403, 'Access denied. This record belongs to a different campus.');
+        }
+        
         $validatedData = $request->validate([
             // Basic Information
             'student_employee_id' => 'required|string',
@@ -304,11 +327,25 @@ class PatientConsultationController extends Controller
 
     public function show(PatientConsultationRecord $record)
     {
+        $userCampus = Auth::user()->campus;
+        
+        // Check if the record belongs to the user's campus
+        if ($record->campus !== $userCampus) {
+            abort(403, 'Access denied. This record belongs to a different campus.');
+        }
+        
         return response()->json($record->load('nurseNotes'));
     }
 
     public function downloadPdf(PatientConsultationRecord $record)
     {
+        $userCampus = Auth::user()->campus;
+        
+        // Check if the record belongs to the user's campus
+        if ($record->campus !== $userCampus) {
+            abort(403, 'Access denied. This record belongs to a different campus.');
+        }
+        
         $pdf = Pdf::loadView('patient-consultation-pdf', compact('record'));
         
         return $pdf->download("consultation-record-{$record->student_employee_id}-{$record->consultation_date_time->format('Y-m-d')}.pdf");
@@ -342,11 +379,27 @@ class PatientConsultationController extends Controller
 
     public function getNurseNotes(PatientConsultationRecord $record)
     {
+        $userCampus = Auth::user()->campus;
+        
+        // Check if the record belongs to the user's campus
+        // Allow access if record campus is null (legacy records) or matches user campus
+        if ($record->campus !== null && $record->campus !== $userCampus) {
+            abort(403, 'Access denied. This record belongs to a different campus.');
+        }
+        
         return response()->json($record->nurseNotes()->orderBy('entry_date_time', 'desc')->get());
     }
 
     public function downloadNurseNotesPdf(PatientConsultationRecord $record)
     {
+        $userCampus = Auth::user()->campus;
+        
+        // Check if the record belongs to the user's campus
+        // Allow access if record campus is null (legacy records) or matches user campus
+        if ($record->campus !== null && $record->campus !== $userCampus) {
+            abort(403, 'Access denied. This record belongs to a different campus.');
+        }
+        
         $nurseNotes = $record->nurseNotes()->orderBy('entry_date_time', 'desc')->get();
         
         $pdf = Pdf::loadView('nurse-notes', compact('record', 'nurseNotes'));
@@ -356,6 +409,12 @@ class PatientConsultationController extends Controller
 
     public function getAuditLogs(PatientConsultationRecord $record)
     {
+        $userCampus = Auth::user()->campus;
+        
+        // Check if the record belongs to the user's campus
+        if ($record->campus !== $userCampus) {
+            abort(403, 'Access denied. This record belongs to a different campus.');
+        }
         $auditLogs = $record->auditLogs()
             ->with('auditable')
             ->orderBy('created_at', 'desc')
@@ -381,7 +440,10 @@ class PatientConsultationController extends Controller
 
     public function getPatientTimeline($studentEmployeeId)
     {
+        $userCampus = Auth::user()->campus;
+        
         $consultations = PatientConsultationRecord::where('student_employee_id', $studentEmployeeId)
+            ->where('campus', $userCampus)
             ->with(['nurseNotes', 'auditLogs'])
             ->orderBy('consultation_date_time', 'desc')
             ->get()

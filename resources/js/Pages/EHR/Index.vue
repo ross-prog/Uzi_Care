@@ -602,23 +602,29 @@ const viewRecord = async (record) => {
 	showRecordModal.value = true;
 
 	// Fetch nurse notes for this record
+	await fetchNurseNotes();
+};
+
+const fetchNurseNotes = async () => {
+	if (!selectedRecord.value?.id) return;
+
 	try {
-		const response = await axios.get(`/ehr/${record.id}/nurse-notes`);
+		const response = await axios.get(`/ehr/${selectedRecord.value.id}/nurse-notes`);
+		console.log("fetchNurseNotes response:", response.data);
 		nurseNotes.value = response.data;
 	} catch (error) {
 		console.error("Error fetching nurse notes:", error);
-		nurseNotes.value = []; // Clear any previous notes on error
+		nurseNotes.value = [];
 	}
 };
 
 const openNurseNotes = async (record) => {
 	selectedRecord.value = record;
 	try {
-		const response = await axios.get(`/ehr/${record.id}/nurse-notes`);
-		nurseNotes.value = response.data;
+		await fetchNurseNotes();
 		showNurseNotesModal.value = true;
 	} catch (error) {
-		console.error("Error fetching nurse notes:", error);
+		console.error("Error opening nurse notes:", error);
 		alert("Error loading nurse notes");
 	}
 };
@@ -630,64 +636,17 @@ const addNurseNote = async () => {
 	}
 
 	try {
-		// Create a new consultation record instead of a nurse note
-		const consultationData = {
-			// Copy basic info from the selected record
-			student_employee_id: selectedRecord.value.student_employee_id,
-			consultation_date_time: new Date().toISOString(),
-			first_name: selectedRecord.value.first_name,
-			last_name: selectedRecord.value.last_name,
-			middle_name: selectedRecord.value.middle_name,
-			age: selectedRecord.value.age,
-			birthdate: selectedRecord.value.birthdate,
-			civil_status: selectedRecord.value.civil_status,
-			sex: selectedRecord.value.sex,
-			address: selectedRecord.value.address,
-			department_course: selectedRecord.value.department_course,
-			contact_no: selectedRecord.value.contact_no,
-			guardian_name: selectedRecord.value.guardian_name,
-			guardian_relationship: selectedRecord.value.guardian_relationship,
-			guardian_contact_no: selectedRecord.value.guardian_contact_no,
-
-			// Medical history from previous record
-			has_allergy: selectedRecord.value.has_allergy,
-			allergy_specify: selectedRecord.value.allergy_specify,
-			has_hypertension: selectedRecord.value.has_hypertension,
-			has_diabetes: selectedRecord.value.has_diabetes,
-			has_asthma: selectedRecord.value.has_asthma,
-			asthma_last_attack: selectedRecord.value.asthma_last_attack,
-			other_medical_history: selectedRecord.value.other_medical_history,
-
-			// New nurse consultation data
-			chief_complaints: nurseNoteForm.nurse_notes,
-			diagnosis: nurseNoteForm.doctor_orders || "Nurse consultation - follow-up care",
-			nurse_on_duty: nurseNoteForm.entered_by_nurse,
-			physician_on_duty: null,
-
-			// Empty vital signs for nurse consultation
-			vital_signs_time_1: null,
-			weight: null,
-			height: null,
-			last_menstrual_period: null,
-			blood_pressure_1: null,
-			heart_rate_1: null,
-			respiratory_rate_1: null,
-			temperature_1: null,
-			oxygen_saturation_1: null,
-			vital_signs_time_2: null,
-			blood_pressure_2: null,
-			heart_rate_2: null,
-			respiratory_rate_2: null,
-			temperature_2: null,
-			oxygen_saturation_2: null,
-
-			// Empty medicines and equipment
-			medicines: [],
-			equipment: [],
+		// Create a simple nurse note using the NurseNote model
+		const nurseNoteData = {
+			patient_consultation_record_id: selectedRecord.value.id,
+			nurse_notes: nurseNoteForm.nurse_notes,
+			doctor_orders: nurseNoteForm.doctor_orders,
+			entered_by_nurse: nurseNoteForm.entered_by_nurse,
+			relationship: nurseNoteForm.relationship,
 		};
 
-		await axios.post("/ehr", consultationData);
-		alert("Nurse consultation added successfully!");
+		await axios.post("/nurse-notes", nurseNoteData);
+		alert("Nurse note added successfully!");
 
 		// Reset form
 		Object.assign(nurseNoteForm, {
@@ -697,14 +656,17 @@ const addNurseNote = async () => {
 			relationship: "",
 		});
 
-		// Close modal and refresh search if needed
+		// Refresh nurse notes and close modal
+		await fetchNurseNotes();
 		showNurseNotesModal.value = false;
+
+		// Refresh search if needed to update timeline
 		if (searchQuery.value === selectedRecord.value.student_employee_id) {
 			searchPatient();
 		}
 	} catch (error) {
-		console.error("Error adding nurse consultation:", error);
-		alert("Error adding nurse consultation");
+		console.error("Error adding nurse note:", error);
+		alert("Error adding nurse note");
 	}
 };
 
@@ -769,6 +731,7 @@ const openDetailedConsultationView = async (record) => {
 
 		// Fetch related nurse notes
 		const notesResponse = await axios.get(`/ehr/${record.id}/nurse-notes`);
+		console.log("Nurse notes response:", notesResponse.data);
 		nurseNotes.value = notesResponse.data;
 
 		showDetailedConsultationModal.value = true;
@@ -2362,7 +2325,7 @@ const formatTime = (time) => {
 			>
 				<div class="mt-3">
 					<div class="flex justify-between items-center mb-4">
-						<h3 class="text-lg font-medium text-gray-900">Add New Consultation</h3>
+						<h3 class="text-lg font-medium text-gray-900">Nurse Notes</h3>
 						<button
 							@click="showNurseNotesModal = false"
 							class="text-gray-400 hover:text-gray-600"
@@ -2400,9 +2363,41 @@ const formatTime = (time) => {
 						</div>
 					</div>
 
-					<!-- Add New Consultation Form -->
+					<!-- Existing Nurse Notes -->
+					<div v-if="nurseNotes && nurseNotes.length > 0" class="mb-6">
+						<h4 class="text-md font-medium text-gray-900 mb-4">Existing Nurse Notes</h4>
+						<div
+							class="space-y-3 max-h-64 overflow-y-auto border rounded-lg p-4 bg-gray-50"
+						>
+							<div
+								v-for="note in nurseNotes"
+								:key="note.id"
+								class="p-3 bg-yellow-50 rounded-lg border border-yellow-200"
+							>
+								<div class="flex justify-between items-start mb-2">
+									<div class="text-xs text-gray-500">
+										<span class="font-medium">{{ note.entered_by_nurse }}</span>
+										<span class="mx-1">•</span>
+										<span>{{
+											new Date(note.entry_date_time || note.created_at).toLocaleString()
+										}}</span>
+									</div>
+								</div>
+								<p class="text-sm text-gray-900">{{ note.nurse_notes }}</p>
+								<div
+									v-if="note.doctor_orders"
+									class="mt-2 pt-2 border-t border-yellow-300"
+								>
+									<span class="text-xs font-medium text-gray-600">Doctor's Orders:</span>
+									<p class="text-sm text-gray-800 mt-1">{{ note.doctor_orders }}</p>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Add New Note Form -->
 					<div class="border-b border-gray-200 pb-6 mb-6">
-						<h4 class="text-md font-medium text-gray-900 mb-4">Add New Consultation</h4>
+						<h4 class="text-md font-medium text-gray-900 mb-4">Add New Note</h4>
 						<div class="space-y-4">
 							<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 								<div>
@@ -2414,38 +2409,28 @@ const formatTime = (time) => {
 										required
 									/>
 								</div>
-								<div>
-									<label class="form-label">Relationship</label>
-									<input
-										v-model="nurseNoteForm.relationship"
-										type="text"
-										class="form-input"
-									/>
-								</div>
 							</div>
 							<div>
-								<label class="form-label">Chief Complaints / Notes *</label>
+								<label class="form-label">Notes *</label>
 								<textarea
 									v-model="nurseNoteForm.nurse_notes"
 									rows="3"
 									class="form-input"
 									required
-									placeholder="Enter the reason for consultation or follow-up notes"
+									placeholder="Enter nurse notes or observations"
 								></textarea>
 							</div>
 							<div>
-								<label class="form-label">Diagnosis / Treatment Plan</label>
+								<label class="form-label">Doctor's Orders / Instructions</label>
 								<textarea
 									v-model="nurseNoteForm.doctor_orders"
 									rows="2"
 									class="form-input"
-									placeholder="Enter diagnosis, treatment, or follow-up instructions"
+									placeholder="Enter any doctor's orders or follow-up instructions"
 								></textarea>
 							</div>
 							<div class="flex justify-end">
-								<button @click="addNurseNote" class="btn-primary">
-									Add Consultation
-								</button>
+								<button @click="addNurseNote" class="btn-primary">Add Note</button>
 							</div>
 						</div>
 					</div>

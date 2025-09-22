@@ -41,7 +41,7 @@
 							</div>
 						</div>
 					</div>
-					
+
 					<!-- Supplies Statistics -->
 					<div class="bg-green-50 p-4 rounded-lg">
 						<h5 class="text-sm font-medium text-green-800 mb-3">Supplies</h5>
@@ -71,8 +71,18 @@
 				<!-- Medicines Section -->
 				<div class="mb-8">
 					<h4 class="text-md font-medium text-gray-800 mb-4 flex items-center">
-						<svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.415-3.414l5-5A2 2 0 009 9.586V5L8 4z"></path>
+						<svg
+							class="w-5 h-5 mr-2 text-blue-500"
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.415-3.414l5-5A2 2 0 009 9.586V5L8 4z"
+							></path>
 						</svg>
 						Medicines Inventory
 					</h4>
@@ -80,13 +90,19 @@
 						<table class="min-w-full divide-y divide-gray-200">
 							<thead class="bg-gray-50">
 								<tr>
-									<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+									<th
+										class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+									>
 										Medicine Name
 									</th>
-									<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+									<th
+										class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+									>
 										Current Stock
 									</th>
-									<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+									<th
+										class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+									>
 										Quantity to Order
 									</th>
 								</tr>
@@ -100,12 +116,16 @@
 										'bg-yellow-50': item.is_expiring_soon && !item.is_low_stock,
 									}"
 								>
-									<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+									<td
+										class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"
+									>
 										{{ item.medicine_name }}
 									</td>
 									<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
 										{{ item.total_quantity }}
-										<span class="text-xs text-gray-500">({{ item.batch_count }} batches)</span>
+										<span class="text-xs text-gray-500"
+											>({{ item.batch_count }} batches)</span
+										>
 									</td>
 									<td class="px-6 py-4 whitespace-nowrap">
 										<input
@@ -125,8 +145,18 @@
 				<!-- Supplies Section -->
 				<div class="mb-8">
 					<h4 class="text-md font-medium text-gray-800 mb-4 flex items-center">
-						<svg class="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M9 9l3-3 3 3"></path>
+						<svg
+							class="w-5 h-5 mr-2 text-green-500"
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M9 9l3-3 3 3"
+							></path>
 						</svg>
 						Supplies Inventory
 					</h4>
@@ -134,14 +164,15 @@
 						<table class="min-w-full divide-y divide-gray-200">
 							<thead class="bg-gray-50">
 								<tr>
-									<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+									<th
+										class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+									>
 										Item Name
 									</th>
-									<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+									<th
+										class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+									>
 										Stock
-									</th>
-									<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-										Quantity to Order
 									</th>
 								</tr>
 							</thead>
@@ -153,20 +184,13 @@
 										'bg-red-50': item.is_low_stock,
 									}"
 								>
-									<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+									<td
+										class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"
+									>
 										{{ item.medicine_name }}
 									</td>
 									<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
 										{{ item.total_quantity }}
-									</td>
-									<td class="px-6 py-4 whitespace-nowrap">
-										<input
-											v-model.number="orderRequests[item.originalIndex].quantity_to_order"
-											type="number"
-											min="0"
-											class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-											placeholder="0"
-										/>
 									</td>
 								</tr>
 							</tbody>
@@ -224,14 +248,14 @@ const medicinesData = computed(() => {
 	if (!props.inventoryData) return [];
 	return props.inventoryData
 		.map((item, index) => ({ ...item, originalIndex: index }))
-		.filter(item => !item.is_supply);
+		.filter((item) => !item.is_supply);
 });
 
 const suppliesData = computed(() => {
 	if (!props.inventoryData) return [];
 	return props.inventoryData
 		.map((item, index) => ({ ...item, originalIndex: index }))
-		.filter(item => item.is_supply);
+		.filter((item) => item.is_supply);
 });
 
 // Initialize order requests immediately
@@ -243,13 +267,9 @@ if (props.inventoryData) {
 }
 
 // Computed properties for statistics
-const medicinesCount = computed(
-	() => medicinesData.value.length
-);
+const medicinesCount = computed(() => medicinesData.value.length);
 
-const suppliesCount = computed(
-	() => suppliesData.value.length
-);
+const suppliesCount = computed(() => suppliesData.value.length);
 
 const medicinesLowStock = computed(
 	() => medicinesData.value.filter((item) => item.is_low_stock).length
@@ -267,25 +287,25 @@ const saveDraft = () => {
 		status: "draft",
 	};
 
-	console.log('Attempting to save draft with data:', data);
-	console.log('Order requests:', orderRequests.value);
-	console.log('Route URL:', route("inventory.save-report"));
+	console.log("Attempting to save draft with data:", data);
+	console.log("Order requests:", orderRequests.value);
+	console.log("Route URL:", route("inventory.save-report"));
 
 	router.post(route("inventory.save-report"), data, {
 		onSuccess: (page) => {
-			console.log('Draft saved successfully:', page);
-			alert('Draft saved successfully!');
+			console.log("Draft saved successfully:", page);
+			alert("Draft saved successfully!");
 			// The redirect from the controller will handle navigation
 		},
 		onError: (errors) => {
-			console.error('Error saving draft:', errors);
-			alert('Error saving draft: ' + JSON.stringify(errors));
+			console.error("Error saving draft:", errors);
+			alert("Error saving draft: " + JSON.stringify(errors));
 		},
 		onStart: () => {
-			console.log('Started sending draft request...');
+			console.log("Started sending draft request...");
 		},
 		onFinish: () => {
-			console.log('Finished draft request...');
+			console.log("Finished draft request...");
 		},
 	});
 };
@@ -298,25 +318,25 @@ const submitReport = () => {
 		status: "submitted",
 	};
 
-	console.log('Attempting to submit report with data:', data);
-	console.log('Order requests:', orderRequests.value);
-	console.log('Route URL:', route("inventory.save-report"));
+	console.log("Attempting to submit report with data:", data);
+	console.log("Order requests:", orderRequests.value);
+	console.log("Route URL:", route("inventory.save-report"));
 
 	router.post(route("inventory.save-report"), data, {
 		onSuccess: (page) => {
-			console.log('Report submitted successfully:', page);
-			alert('Report submitted successfully!');
+			console.log("Report submitted successfully:", page);
+			alert("Report submitted successfully!");
 			// The redirect from the controller will handle navigation
 		},
 		onError: (errors) => {
-			console.error('Error submitting report:', errors);
-			alert('Error submitting report: ' + JSON.stringify(errors));
+			console.error("Error submitting report:", errors);
+			alert("Error submitting report: " + JSON.stringify(errors));
 		},
 		onStart: () => {
-			console.log('Started sending submit request...');
+			console.log("Started sending submit request...");
 		},
 		onFinish: () => {
-			console.log('Finished submit request...');
+			console.log("Finished submit request...");
 		},
 	});
 };
